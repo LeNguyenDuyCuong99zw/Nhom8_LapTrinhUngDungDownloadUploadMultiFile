@@ -139,5 +139,65 @@ class AsyncUploader:
             "fileSize": self.state.file_size,
         })
 
-    
+    async def upload(self):
+        if not self.state:
+            error_msg = "Call start() first"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        assert self.websocket is not None
+
+        logger.info("Starting upload process for %s", self.state.file_path.name)
+        
+        with open(self.state.file_path, "rb") as f:
+            # Seek to resume offset if any
+            if self.state.offset:
+                logger.debug("Seeking to offset: %d", self.state.offset)
+                f.seek(self.state.offset)
+
+            while not self.state.is_stopped and self.state.offset < self.state.file_size:
+                # Respect pause
+                await self._pause_event.wait()
+                if self.state.is_stopped:
+                    break
+                # đảm bảo con trỏ file trùng với offset hiện tại
+                cur = f.tell()
+                if self.state.offset != cur:
+                    logger.debug("Resync file pointer: tell=%d -> offset=%d", cur, self.state.offset)
+                    f.seek(self.state.offset)
+                
+                chunk = f.read(self.chunk_size)
+                if not chunk:
+                    break
+
+                # base64 encode
+                data_b64 = base64.b64encode(chunk).decode("ascii")
+                offset_before = self.state.offset
+
+                await self._send_json({
+                    "action": "chunk",
+                    "fileId": self.state.file_id,
+                    "offset": offset_before,
+                    "data": data_b64,
+                })
+
+                # Optimistically advance; server will correct via offset-mismatch
+                self.state.offset += len(chunk)
+
+                # Gentle yield to event loop
+                await asyncio.sleep(0)
+
+        if not self.state.is_stopped and self.state.offset >= self.state.file_size:
+            logger.info("Upload completed, finalizing file: %s", self.state.file_path.name)
+            await self.complete()
+
+    async def pause(self):
+        if not self.state or self.state.is_paused:
+            return
+        self.state.is_paused = True
+        self._pause_event.clear()
+        logger.info("Pausing upload for %s", self.state.file_path.name)
+        await self._send_json({
+            "action": "pause",
+            "fileId": self.state.file_id,
+        })
 
