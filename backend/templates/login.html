@@ -211,7 +211,16 @@
         }
       }
 
-     
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+
+        if (!username || !password) {
+          showError("Vui lòng nhập đầy đủ thông tin");
+          return;
+        }
 
         hideError();
         setLoading(true);
