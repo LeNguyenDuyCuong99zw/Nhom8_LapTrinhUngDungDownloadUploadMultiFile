@@ -1,6 +1,15 @@
 /* Updated: 2025-08-20 10:10 - Balanced colors for completed files */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap");
 
+/* Theme variables */
+:root {
+  --bg-color: #0f1620; /* slightly brighter than before for contrast */
+  --panel-bg: #151821;
+  --muted: #9aa0a6;
+  --accent: #2b82ff; /* main blue accent */
+  --accent-strong: #1f6fe6;
+}
+
 /* Reset and base */
 * {
   box-sizing: border-box;
@@ -8,8 +17,8 @@
 body {
   margin: 0;
   font-family: "Inter", sans-serif;
-  background-color: #0e1014;
-  color: #b0b3bb;
+  background-color: var(--bg-color);
+  color: #bfc6cc;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
@@ -34,7 +43,7 @@ body {
 }
 
 .header-text h1 {
-  color: #3391ff;
+  color: var(--accent);
   font-weight: 700;
   font-size: 2rem;
   margin: 0 0 0.25rem 0;
@@ -69,10 +78,10 @@ body {
 }
 
 .nav-btn:hover {
-  background-color: #3391ff;
-  border-color: #3391ff;
+  background-color: var(--accent);
+  border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(51, 145, 255, 0.3);
+  box-shadow: 0 6px 20px rgba(43, 130, 255, 0.18);
 }
 
 .nav-btn svg {
@@ -94,9 +103,9 @@ body {
 }
 
 .settings-btn:hover {
-  background-color: #1e2128;
-  border-color: #3391ff;
-  color: #3391ff;
+  background-color: #1f242b;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Modal */
@@ -113,7 +122,7 @@ body {
 }
 
 .modal-content {
-  background-color: #16181e;
+  background-color: var(--panel-bg);
   margin: 5% auto;
   border: 1px solid #2a2d36;
   border-radius: 12px;
@@ -132,7 +141,7 @@ body {
 
 .modal-header h3 {
   margin: 0;
-  color: #3391ff;
+  color: var(--accent);
   font-size: 1.25rem;
   font-weight: 600;
 }
@@ -226,7 +235,7 @@ body {
   margin-bottom: 2rem;
 }
 .card {
-  background-color: #16181e;
+  background-color: var(--panel-bg);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -250,7 +259,7 @@ body {
   color: white;
 }
 .icon-active {
-  background-color: #254edb;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
 }
 .icon-completed {
   background: linear-gradient(135deg, #059669, #047857);
@@ -294,8 +303,8 @@ body {
   }
 }
 .dropzone {
-  background-color: #16181e;
-  border: 2px dashed #23262e;
+  background-color: var(--panel-bg);
+  border: 2px dashed #252b34;
   border-radius: 12px;
   padding: 3rem 2rem;
   text-align: center;
@@ -307,12 +316,12 @@ body {
   gap: 1rem;
 }
 .dropzone:hover {
-  border-color: #3391ff;
-  background-color: #1f2229;
+  border-color: var(--accent);
+  background-color: #1f252d;
 }
 .dropzone.drag-over {
-  border-color: #3391ff;
-  background-color: #1f2229;
+  border-color: var(--accent);
+  background-color: #1f252d;
   transform: scale(1.02);
 }
 .dropzone .icon {
@@ -396,7 +405,7 @@ body {
   box-shadow: 0 0 0 2px rgba(51, 145, 255, 0.2);
 }
 .url-input-group button {
-  background-color: #3391ff;
+  background-color: var(--accent);
   color: white;
   border: none;
   border-radius: 8px;
@@ -409,7 +418,7 @@ body {
   transition: background-color 0.3s ease;
 }
 .url-input-group button:hover {
-  background-color: #2a7fd9;
+  background-color: var(--accent-strong);
 }
 .url-input-group button svg {
   width: 16px;
@@ -478,8 +487,8 @@ body {
   background-color: #1f2229;
 }
 .tab.active {
-  color: #3391ff;
-  background-color: #16181e;
+  color: var(--accent);
+  background-color: var(--panel-bg);
 }
 
 /* View Toggle Buttons */
@@ -510,17 +519,17 @@ body {
 }
 
 .view-btn.active {
-  background-color: #3391ff;
+  background-color: var(--accent);
   color: white;
 }
 
 /* No transfers */
 .no-transfers {
   text-align: center;
-  color: #6a6f7a;
+  color: #8f969c;
   font-size: 1rem;
   padding: 2rem 1.25rem;
-  background-color: #16181e;
+  background-color: var(--panel-bg);
   border-radius: 8px;
   box-shadow: 0 0 0 1px #23262e;
   min-height: 120px;
@@ -535,9 +544,9 @@ body {
   overflow-y: auto; /* Scroll khi quá cao */
   padding-right: 8px; /* Space cho scrollbar */
   margin-bottom: 1rem; /* Giảm margin */
-  border: 1px solid #2a2d38; /* Thêm border để rõ container */
+  border: 1px solid #26313b; /* Thêm border để rõ container */
   border-radius: 8px;
-  background: #1a1d24; /* Background nhẹ để phân biệt */
+  background: #161a20; /* Background nhẹ để phân biệt */
 
   /* Custom scrollbar */
   scrollbar-width: thin;
@@ -565,7 +574,7 @@ body {
 }
 
 .transfers-scroll-wrapper::-webkit-scrollbar-thumb {
-  background: #3391ff;
+  background: var(--accent);
   border-radius: 4px;
 }
 
@@ -597,7 +606,7 @@ body {
 }
 
 .transfers-list::-webkit-scrollbar-thumb {
-  background: #3391ff;
+  background: var(--accent);
   border-radius: 4px;
 }
 
@@ -721,4 +730,465 @@ body {
 
 .transfer-item:hover {
   background-color: #1f2229;
+}
+
+.transfer-item.completed {
+  opacity: 0.95;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.06),
+    rgba(16, 185, 129, 0.04)
+  );
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.12);
+}
+
+.transfer-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.transfer-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: white;
+  flex-shrink: 0;
+}
+
+.transfer-item.completed .transfer-icon {
+  background: linear-gradient(135deg, #059669, #047857);
+  box-shadow: 0 0 12px rgba(5, 150, 105, 0.25);
+}
+
+.transfer-item.paused .transfer-icon {
+  background-color: #a56c09;
+}
+
+.transfer-item.error .transfer-icon {
+  background-color: #dc2626;
+}
+
+.transfer-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.transfer-name {
+  font-weight: 600;
+  color: #e3e5e8;
+  font-size: 0.875rem;
+}
+
+.transfer-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: #6a6f7a;
+}
+
+.transfer-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 200px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #23262e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--accent);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.transfer-item.completed .progress-fill {
+  background: linear-gradient(90deg, #059669, #047857);
+  box-shadow: 0 0 6px rgba(5, 150, 105, 0.3);
+}
+
+.transfer-percentage {
+  font-size: 0.75rem;
+  color: #6a6f7a;
+  text-align: center;
+}
+
+.transfer-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.status-text {
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--accent);
+  background-color: rgba(43, 130, 255, 0.08);
+  border-radius: 6px;
+  border: 1px solid rgba(43, 130, 255, 0.14);
+}
+
+.status-text.completed {
+  color: #059669;
+  background: linear-gradient(
+    135deg,
+    rgba(5, 150, 105, 0.15),
+    rgba(4, 120, 87, 0.1)
+  );
+  border: 1px solid rgba(5, 150, 105, 0.3);
+  box-shadow: 0 0 8px rgba(5, 150, 105, 0.15);
+  font-weight: 500;
+}
+
+.action-btn {
+  background: none;
+  border: 1px solid #23262e;
+  border-radius: 6px;
+  padding: 0.5rem;
+  color: #6a6f7a;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn:hover {
+  background-color: #1f2229;
+  color: #e3e5e8;
+  border-color: #3391ff;
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-btn:disabled:hover {
+  background: none;
+  border-color: #23262e;
+  color: #6a6f7a;
+}
+
+/* Specific button styles */
+.action-btn.start-btn:hover {
+  border-color: #1a4f2a;
+  color: #4ade80;
+}
+
+.action-btn.pause-btn:hover {
+  border-color: #a56c09;
+  color: #fbbf24;
+}
+
+.action-btn.resume-btn:hover {
+  border-color: #1a4f2a;
+  color: #4ade80;
+}
+
+.action-btn.stop-btn:hover {
+  border-color: #dc2626;
+  color: #f87171;
+}
+
+/* FIX: Make restart and remove buttons more visible */
+.action-btn.restart-btn {
+  background: linear-gradient(135deg, var(--accent) 0%, #5eb3ff 100%);
+  color: white;
+  border: 1px solid var(--accent);
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  min-width: auto;
+  white-space: nowrap;
+}
+
+.action-btn.restart-btn:hover {
+  background: linear-gradient(135deg, #5eb3ff 0%, #7cc3ff 100%);
+  border-color: #5eb3ff;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(51, 145, 255, 0.3);
+}
+
+.action-btn.remove-btn {
+  background: linear-gradient(135deg, #dc2626 0%, #f87171 100%);
+  color: white;
+  border: 1px solid #dc2626;
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  min-width: auto;
+  white-space: nowrap;
+}
+
+.action-btn.remove-btn:hover {
+  background: linear-gradient(135deg, #f87171 0%, #fca5a5 100%);
+  border-color: #f87171;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* Ensure buttons show text and icon */
+.action-btn.restart-btn svg,
+.action-btn.remove-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Notifications */
+.notification {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  background-color: #16181e;
+  border: 1px solid #23262e;
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  color: #e3e5e8;
+  font-weight: 600;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease;
+}
+
+.notification.success {
+  border-color: #1a4f2a;
+  background-color: #0f1f13;
+}
+
+.notification.error {
+  border-color: #dc2626;
+  background-color: #1f0f0f;
+}
+
+.notification.info {
+  border-color: var(--accent);
+  background-color: rgba(43, 130, 255, 0.06);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .transfer-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .transfer-progress {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .transfer-actions {
+    align-self: flex-end;
+  }
+
+  .notification {
+    right: 1rem;
+    left: 1rem;
+  }
+}
+
+/* SVG icons */
+svg.icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+  fill: currentColor;
+}
+
+/* Previous session indicators */
+.transfer-item.previous-session {
+  border-left: 3px solid #3391ff;
+  background: linear-gradient(135deg, #0e1014 0%, #1a1e26 100%);
+}
+
+.transfer-item.previous-session::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  background: #3391ff;
+  border-radius: 50%;
+  opacity: 0.8;
+}
+
+.time-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #6a6f7a;
+  background: rgba(51, 145, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(51, 145, 255, 0.2);
+  margin-top: 4px;
+}
+
+.time-indicator svg {
+  opacity: 0.7;
+}
+
+.transfer-name-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.transfer-name-row .transfer-name {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Grid view time indicator positioning */
+.transfer-item.grid-view .time-indicator {
+  margin-top: 4px;
+}
+
+/* Enhanced visual separation for previous session files */
+.transfer-item.previous-session.completed {
+  border-left: 3px solid #22c55e;
+  background: linear-gradient(135deg, #0e1014 0%, #0f1a1a 100%);
+}
+
+.transfer-item.previous-session.completed::before {
+  background: #22c55e;
+}
+
+/* Hover effects for previous session files */
+.transfer-item.previous-session:hover {
+  background: linear-gradient(135deg, #1a1e26 0%, #242930 100%);
+  border-left-color: #5eb3ff;
+}
+
+.transfer-item.previous-session:hover::before {
+  background: #5eb3ff;
+  transform: scale(1.2);
+  transition: all 0.2s ease;
+}
+
+/* Transfer sections styling */
+.transfers-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.transfer-section {
+  background: rgba(26, 30, 38, 0.3);
+  border-radius: 12px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: rgba(43, 130, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  margin: 0;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e1e5e9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-header h3::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3391ff;
+}
+
+.previous-session .section-header h3::before {
+  background: #6a6f7a;
+}
+
+.section-count {
+  font-size: 0.875rem;
+  color: #6a6f7a;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.transfer-section .transfers-list,
+.transfer-section .transfers-grid {
+  padding: 1rem;
+  margin: 0;
+  background: transparent;
+}
+
+.transfer-section .transfer-item {
+  background: rgba(14, 16, 20, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.transfer-section .transfer-item:hover {
+  background: rgba(26, 30, 38, 0.8);
+}
+
+/* Special styling for previous session section */
+.previous-session {
+  background: rgba(26, 30, 38, 0.2);
+  border-color: rgba(106, 111, 122, 0.2);
+}
+
+.previous-session .section-header {
+  background: rgba(106, 111, 122, 0.1);
+}
+
+.previous-session .transfer-item {
+  opacity: 0.9;
+}
+
+.previous-session .transfer-item:hover {
+  opacity: 1;
 }
