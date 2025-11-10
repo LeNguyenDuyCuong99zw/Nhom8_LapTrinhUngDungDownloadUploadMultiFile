@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FlexTransfer Hub</title>
+  <title>FlexTransfer Hub</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <link href="style.css" rel="stylesheet" />
   </head>
@@ -14,11 +14,11 @@
           <div class="header-text">
             <h1>FlexTransfer Hub</h1>
             <p>
-              Professional multi-file transfer manager with advanced controls
+              Trình quản lý truyền tệp đa luồng chuyên nghiệp với điều khiển nâng cao
             </p>
           </div>
           <div class="header-buttons">
-            <button class="nav-btn" id="file-manager-btn" title="File Manager">
+            <button class="nav-btn" id="file-manager-btn" title="Quản lý tệp">
               <svg
                 width="20"
                 height="20"
@@ -29,9 +29,9 @@
                   d="M20 6h-2l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"
                 />
               </svg>
-              <span>File Manager</span>
+              <span>Quản lý tệp</span>
             </button>
-            <button class="settings-btn" id="settings-btn" title="Settings">
+            <button class="settings-btn" id="settings-btn" title="Cài đặt">
               <svg
                 width="20"
                 height="20"
@@ -51,12 +51,12 @@
       <div class="modal" id="settings-modal">
         <div class="modal-content">
           <div class="modal-header">
-            <h3>Upload Settings</h3>
+            <h3>Cài đặt tải lên</h3>
             <button class="close-btn" id="close-settings">&times;</button>
           </div>
           <div class="modal-body">
             <div class="setting-group">
-              <label for="max-concurrent-slider">Max Concurrent Uploads:</label>
+              <label for="max-concurrent-slider">Số tải lên đồng thời tối đa:</label>
               <input
                 type="range"
                 id="max-concurrent-slider"
@@ -67,7 +67,7 @@
               <span id="max-concurrent-value">5</span>
             </div>
             <div class="setting-group">
-              <label for="chunk-size-select">Chunk Size (KB):</label>
+              <label for="chunk-size-select">Kích thước khối (KB):</label>
               <select id="chunk-size-select">
                 <option value="256">256 KB</option>
                 <option value="512" selected>512 KB</option>
@@ -78,13 +78,13 @@
             <div class="setting-group">
               <label>
                 <input type="checkbox" id="auto-start-queue" />
-                Auto-start queued uploads
+                Tự động bắt đầu hàng đợi
               </label>
             </div>
           </div>
           <div class="modal-footer">
             <button class="btn btn-apply" id="apply-settings">
-              Apply Settings
+              Áp dụng
             </button>
           </div>
         </div>
@@ -100,7 +100,7 @@
             </svg>
           </div>
           <div class="card-text">
-            <span>Active Transfers</span>
+            <span>Đang truyền</span>
             <span
               ><b id="active-count">0</b> /
               <small id="max-concurrent">5</small></span
@@ -115,7 +115,7 @@
             </svg>
           </div>
           <div class="card-text">
-            <span>Completed</span>
+            <span>Đã hoàn thành</span>
             <span><b>0</b></span>
           </div>
         </div>
@@ -129,7 +129,7 @@
             </svg>
           </div>
           <div class="card-text">
-            <span>Total Files</span>
+            <span>Tổng số tệp</span>
             <span><b>0</b></span>
           </div>
         </div>
@@ -143,13 +143,152 @@
             </svg>
           </div>
           <div class="card-text">
-            <span>Total Speed</span>
+            <span>Tổng tốc độ</span>
             <span>0 KB/s</span>
           </div>
         </div>
       </section>
 
+      <section
+        class="upload-section"
+        aria-label="File upload and download input"
+      >
+        <label
+          for="file-dropzone"
+          class="dropzone"
+          tabindex="0"
+          aria-describedby="dropzone-info"
+        >
+          <span class="icon" aria-hidden="true">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"
+              />
+            </svg>
+          </span>
+          <p><strong>Kéo thả tệp để tải lên</strong></p>
+          <p>hoặc <a href="#" id="browse-files-link">duyệt tệp</a></p>
+          <small id="dropzone-info">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+              />
+            </svg>
+            Hỗ trợ mọi loại tệp
+          </small>
+          <input
+            type="file"
+            id="file-dropzone"
+            multiple
+            style="display: none"
+          />
+        </label>
 
+        <form
+          class="add-url-section"
+          onsubmit="event.preventDefault()"
+          aria-labelledby="add-url-label"
+        >
+          <div class="add-url-header" id="add-url-label">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12 2C4.48 2 2 4.48 2 12s2.48 10 10 10 10-2.48 10-10S19.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
+              />
+            </svg>
+            <span>Thêm liên kết tải</span>
+          </div>
+          <div class="url-input-group">
+              <input
+              type="text"
+              id="download-url"
+              name="download-url"
+              placeholder="https://example.com/file.zip"
+              aria-label="Nhập liên kết tải trực tiếp"
+              spellcheck="false"
+            />
+            <button
+              id="add-url-btn"
+              aria-label="Thêm liên kết"
+              type="submit"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+              </svg>
+              Thêm
+            </button>
+          </div>
+          <small class="add-url-instruction">
+            Nhập liên kết tải trực tiếp để thêm vào hàng đợi
+          </small>
+        </form>
+      </section>
+
+      <nav class="tabs-wrapper" role="tablist" aria-label="Transfer type tabs">
+        <div class="tabs-left">
+          <button
+            class="tab active"
+            role="tab"
+            aria-selected="true"
+            tabindex="0"
+            id="tab-all"
+            aria-controls="panel-all"
+          >
+            Tất cả
+          </button>
+          <button
+            class="tab"
+            role="tab"
+            aria-selected="false"
+            tabindex="-1"
+            id="tab-uploads"
+            aria-controls="panel-uploads"
+          >
+            Tải lên
+          </button>
+          <button
+            class="tab"
+            role="tab"
+            aria-selected="false"
+            tabindex="-1"
+            id="tab-downloads"
+            aria-controls="panel-downloads"
+          >
+            Tải xuống
+          </button>
+        </div>
+        <div class="tabs-right">
+          <div class="view-toggle">
+            <button class="view-btn active" id="list-view" title="Dạng danh sách">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"
+                />
+              </svg>
+            </button>
+            <button class="view-btn" id="grid-view" title="Dạng ô">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"
+                />
+              </svg>
+            </button>
+          </div>
+          <button class="clear-previous-btn" id="clear-previous-btn" title="Xóa tệp phiên trước">
+            🗑️ Xóa phiên trước
+          </button>
+        </div>
+      </nav>
+          </button>
+
+      <section aria-live="polite" aria-atomic="true" class="no-transfers">
+        Chưa có tác vụ truyền nào
+      </section>
+    </div>
 
     <script>
       // WebSocket configuration
