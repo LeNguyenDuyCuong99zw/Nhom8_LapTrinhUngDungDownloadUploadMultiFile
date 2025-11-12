@@ -663,4 +663,384 @@ def get_file_preview_info(file_id):
         logger.error(f"Error getting file preview info: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/folders', methods=['POST'])
+@login_required
+def create_folder():
+    """Tạo folder mới (có thể nested) - USER ISOLATED"""
+    try:
+        # Lấy user hiện tại từ request.current_user
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "User not found"}), 401
+            
+        user_id = user['id']
+        username = user['username']
+        
+        data = request.get_json()
+        folder_name = data.get('name')
+        parent_id = data.get('parent_id')  # Thêm support cho parent folder
+        
+        if not folder_name:
+            return jsonify({"error": "Folder name is required"}), 400
+        
+        # Xác định path cho folder mới - THEO USER
+        user_base_path = f"{username}"
+        
+        if parent_id:
+            # Tìm parent folder - CHỈ TRONG FOLDER CỦA USER
+            legacy_data = load_legacy_db()
+            parent_folder = None
+            for folder in legacy_data["folders"]:
+                if folder["id"] == parent_id and folder.get("user_id") == user_id:
+                    parent_folder = folder
+                    break
+            
+            if not parent_folder:
+                return jsonify({"error": "Parent folder not found or access denied"}), 404
+            
+            # Tạo nested path trong folder của user
+            folder_path = UPLOAD_FOLDER / parent_folder["path"] / folder_name
+            relative_path = str((Path(parent_folder["path"]) / folder_name))
+        else:
+            # Root level folder - TRONG FOLDER CỦA USER
+            folder_path = UPLOAD_FOLDER / user_base_path / folder_name
+            relative_path = f"{user_base_path}/{folder_name}"
+        
+        # Tạo folder trên disk
+        folder_path.mkdir(parents=True, exist_ok=True)
+        
+        # Tạo thông tin folder - VỚI USER_ID
+        folder_info = {
+            "id": str(uuid.uuid4()),
+            "name": folder_name,
+            "path": relative_path,
+            "parent_id": parent_id,
+            "user_id": user_id,  # QUAN TRỌNG: Gán folder cho user
+            "username": username,
+            "created_time": datetime.now().isoformat(),
+            "type": "folder"
+        }
+        
+        # Lưu vào legacy database (cho folders)
+        legacy_data = load_legacy_db()
+        legacy_data["folders"].append(folder_info)
+        save_legacy_db(legacy_data)
+        
+        logger.info(f"Folder created: {folder_name} by user {username} (user_id: {user_id}, parent: {parent_id})")
+        return jsonify({
+            "success": True,
+            "folder_id": folder_info["id"],
+            "message": "Folder created successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating folder: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/folders/<folder_id>', methods=['DELETE'])
+@login_required
+def delete_folder(folder_id):
+    """Xóa folder từ legacy database - USER ISOLATED"""
+    try:
+        user = get_current_user()
+        user_id = user['id']
+        logger.info(f"Deleting folder {folder_id} for user {user['username']} (ID: {user_id})")
+        
+        # FIX: First, move all files in this folder to recycle bin
+        files_in_folder = db.get_files_by_folder(folder_id, user_id)
+        deleted_files_count = 0
+        
+        for file_info in files_in_folder:
+            success = db.move_to_recycle_bin(file_info['id'], user_id, days_to_keep=7)
+            if success:
+                deleted_files_count += 1
+                logger.info(f"Moved file {file_info['filename']} to recycle bin")
+        
+        logger.info(f"Moved {deleted_files_count} files to recycle bin before deleting folder")
+        
+        legacy_data = load_legacy_db()
+        for i, folder_info in enumerate(legacy_data["folders"]):
+            if folder_info["id"] == folder_id and folder_info.get("user_id") == user_id:
+                # Xóa folder từ disk
+                folder_path = UPLOAD_FOLDER / folder_info["path"]
+                logger.info(f"Attempting to delete folder path: {folder_path}")
+                if folder_path.exists():
+                    shutil.rmtree(folder_path)
+                    logger.info(f"Successfully deleted folder from disk: {folder_path}")
+                
+                # Xóa khỏi legacy database
+                deleted_folder = legacy_data["folders"].pop(i)
+                save_legacy_db(legacy_data)
+                
+                logger.info(f"Folder deleted: {deleted_folder['name']} by user {user['username']}")
+                return jsonify({
+                    "success": True, 
+                    "message": f"Folder deleted successfully. {deleted_files_count} files moved to recycle bin.",
+                    "deleted_files": deleted_files_count
+                })
+        
+        logger.warning(f"Folder {folder_id} not found or access denied for user {user_id}")
+        return jsonify({"error": "Folder not found or access denied"}), 404
+    except Exception as e:
+        logger.error(f"Error deleting folder: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/stats', methods=['GET'])
+@login_required
+def get_stats():
+    """Lấy thống kê của user hiện tại từ SQLite database"""
+    try:
+        user = get_current_user()
+        logger.info(f"Getting stats for user: {user['id']} ({user['username']})")
+        
+        # Lấy files của user hiện tại
+        user_files = db.get_user_files(user['id'])
+        
+        # Tính toán stats cho user
+        total_files = len(user_files)
+        completed_files = len([f for f in user_files if f['status'] == 'completed'])
+        uploading_files = len([f for f in user_files if f['status'] == 'uploading'])
+        paused_files = len([f for f in user_files if f['status'] == 'paused'])
+        total_size = sum(f['size'] or 0 for f in user_files if f['status'] == 'completed')
+        
+        # Lấy folder stats từ legacy database - FILTER THEO USER_ID (kể cả admin)
+        legacy_data = load_legacy_db()
+        user_folders = []
+        for folder in legacy_data.get("folders", []):
+            # Chỉ đếm folders thuộc về user hiện tại
+            if folder.get("user_id") == user['id']:
+                user_folders.append(folder)
+        
+        total_folders = len(user_folders)
+        
+        # Lấy thống kê file types từ completed files của user
+        file_types = {}
+        for file_info in user_files:
+            if file_info['status'] == 'completed':
+                ext = Path(file_info["original_filename"]).suffix.lower()
+                if ext:
+                    file_types[ext] = file_types.get(ext, 0) + 1
+        
+        logger.info(f"User {user['id']} stats: {total_files} files, {completed_files} completed")
+        
+        return jsonify({
+            "total_files": total_files,
+            "completed_files": completed_files,
+            "uploading_files": uploading_files,
+            "paused_files": paused_files,
+            "total_folders": total_folders,
+            "total_size": total_size,
+            "file_types": file_types
+        })
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/files/status/<status>', methods=['GET'])
+def get_files_by_status(status):
+    """Lấy files theo status cụ thể"""
+    try:
+        valid_statuses = ['uploading', 'paused', 'completed', 'error']
+        if status not in valid_statuses:
+            return jsonify({"error": f"Invalid status. Valid: {valid_statuses}"}), 400
+        
+        files = db.get_all_files(status=status)
+        formatted_files = []
+        for file in files:
+            formatted_files.append({
+                "id": file["id"],
+                "name": file["original_filename"],
+                "path": file["file_path"] or "",
+                "size": file["size"],
+                "upload_time": file["created_at"],
+                "status": file["status"],
+                "type": "file"
+            })
+        
+        return jsonify(formatted_files)
+    except Exception as e:
+        logger.error(f"Error getting files by status: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/cleanup', methods=['POST'])
+def cleanup_old_files():
+    """Dọn dẹp các file tạm cũ"""
+    try:
+        deleted_count = db.cleanup_temp_files()
+        return jsonify({
+            "success": True,
+            "deleted_count": deleted_count,
+            "message": f"Cleaned up {deleted_count} old files"
+        })
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/files/<file_id>/move', methods=['POST'])
+@login_required
+def move_file_to_folder(file_id):
+    """Di chuyển file vào folder"""
+    try:
+        # Lấy user hiện tại
+        user = get_current_user()
+        username = user['username']
+        user_id = user['id']
+        
+        data = request.get_json()
+        folder_id = data.get('folder_id')
+        
+        logger.info(f"🔄 Move file request: file_id={file_id}, folder_id={folder_id}, user={username}")
+        
+        # Cho phép folder_id = null để di chuyển về root
+        move_to_root = folder_id is None or folder_id == ""
+        
+        if not move_to_root and not folder_id:
+            return jsonify({"error": "Folder ID is required"}), 400
+            
+        # Lấy thông tin file từ database
+        files = db.get_all_files()
+        file_info = None
+        for f in files:
+            if str(f["id"]) == str(file_id):
+                file_info = f
+                break
+                
+        if not file_info:
+            logger.error(f"❌ File not found: {file_id}")
+            return jsonify({"error": "File not found"}), 404
+            
+        # Kiểm tra file có thuộc về user này không
+        if file_info["user_id"] != user_id:
+            logger.error(f"❌ Permission denied: file user_id={file_info['user_id']}, current user_id={user_id}")
+            return jsonify({"error": "Permission denied"}), 403
+            
+        # Lấy thông tin folder (nếu không phải di chuyển về root)
+        folder = None
+        if not move_to_root:
+            legacy_data = load_legacy_db()
+            for f in legacy_data["folders"]:
+                if f["id"] == folder_id:
+                    folder = f
+                    break
+                    
+            if not folder:
+                logger.error(f"❌ Folder not found: {folder_id}")
+                return jsonify({"error": "Folder not found"}), 404
+                
+            # Kiểm tra folder có thuộc về user này không (chỉ check nếu folder có user_id)
+            folder_user_id = folder.get("user_id")
+            if folder_user_id is not None and folder_user_id != user_id:
+                logger.error(f"❌ Folder permission denied: folder user_id={folder_user_id}, current user_id={user_id}")
+                return jsonify({"error": "Folder permission denied"}), 403
+            
+        # Xác định đường dẫn file hiện tại
+        current_file_path = file_info.get("file_path")
+        logger.info(f"📁 Current file_path in DB: {current_file_path}")
+        
+        # Tìm file trên disk
+        possible_paths = []
+        if current_file_path:
+            possible_paths.append(UPLOAD_FOLDER / current_file_path)
+        
+        # Thêm các đường dẫn có thể khác
+        possible_paths.extend([
+            UPLOAD_FOLDER / username / file_info["original_filename"],
+            UPLOAD_FOLDER / file_info["original_filename"],
+            UPLOAD_FOLDER / username / "root" / file_info["original_filename"]
+        ])
+        
+        current_path = None
+        for path in possible_paths:
+            logger.info(f"🔍 Checking path: {path}")
+            if path.exists():
+                current_path = path
+                logger.info(f"✅ Found file at: {path}")
+                break
+        
+        if not current_path:
+            logger.error(f"❌ File not found on disk. Searched paths: {[str(p) for p in possible_paths]}")
+            return jsonify({"error": f"File not found on disk"}), 404
+            
+        # Xác định đường dẫn đích
+        if move_to_root:
+            # Di chuyển về root - thư mục username
+            target_folder_path = UPLOAD_FOLDER / username
+            new_file_path = target_folder_path / file_info["original_filename"]
+            new_relative_path = f"{username}/{file_info['original_filename']}"
+            target_name = "Root"
+            logger.info(f"📂 Moving to root: {target_folder_path}")
+        else:
+            # Di chuyển vào folder
+            folder_path = folder.get("path")
+            if not folder_path or folder_path == "None" or folder_path.startswith("None/"):
+                # Folder cũ không có path đúng, tạo path mới
+                folder_path = f"{username}/{folder['name']}"
+            elif not folder_path.startswith(f"{username}/"):
+                # Path không có username prefix, thêm vào
+                folder_path = f"{username}/{folder['name']}"
+                
+            target_folder_path = UPLOAD_FOLDER / folder_path
+            new_file_path = target_folder_path / file_info["original_filename"]
+            new_relative_path = str(new_file_path.relative_to(UPLOAD_FOLDER))
+            target_name = folder['name']
+            logger.info(f"📂 Moving to folder: {target_folder_path}")
+            
+        logger.info(f"📄 New file path: {new_file_path}")
+        
+        # Tạo thư mục đích
+        target_folder_path.mkdir(parents=True, exist_ok=True)
+        
+        # Kiểm tra file đích đã tồn tại chưa
+        if new_file_path.exists():
+            # Nếu file đích đã tồn tại và khác với file nguồn, tạo tên mới
+            if new_file_path.resolve() != current_path.resolve():
+                # Tạo tên file mới với timestamp để tránh trùng lặp
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                name_parts = file_info["original_filename"].rsplit('.', 1)
+                if len(name_parts) == 2:
+                    new_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}"
+                else:
+                    new_filename = f"{file_info['original_filename']}_{timestamp}"
+                
+                new_file_path = target_folder_path / new_filename
+                new_relative_path = str(new_file_path.relative_to(UPLOAD_FOLDER))
+                logger.info(f"📝 File exists, using new name: {new_filename}")
+            else:
+                # Nếu là cùng một file (chỉ là symbolic link hoặc hardlink), bỏ qua
+                logger.info(f"✅ Source and destination are the same file, operation completed")
+                return jsonify({
+                    "success": True,
+                    "message": f"File is already in {target_name}"
+                })
+            
+        # Di chuyển file
+        shutil.move(str(current_path), str(new_file_path))
+        logger.info(f"✅ File moved successfully from {current_path} to {new_file_path}")
+        
+        # Cập nhật database với path tương đối
+        success = db.update_file_path(file_id, new_relative_path)
+        
+        if not success:
+            logger.error(f"❌ Failed to update database for file {file_id}")
+            # Rollback: move file back
+            shutil.move(str(new_file_path), str(current_path))
+            return jsonify({"error": "Failed to update database"}), 500
+            
+        # Cập nhật folder_id trong database
+        # Nếu di chuyển về root thì folder_id = null
+        target_folder_id = None if move_to_root else folder_id
+        db.update_file_folder(file_id, target_folder_id)
+        
+        logger.info(f"✅ File {file_info['original_filename']} moved successfully to {target_name}")
+        return jsonify({
+            "success": True,
+            "message": f"File moved to {target_name} successfully"
+        })
+            
+    except Exception as e:
+        logger.error(f"❌ Error moving file: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
 
