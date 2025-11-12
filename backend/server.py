@@ -393,4 +393,232 @@ class UploadManager:
                 except Exception as e:
                     logger.warning("Failed to send message to client: %s", e)
 
- 
+    async def upload_to_remote_server(self, session: UploadSession) -> bool:
+        """Upload completed file to remote server"""
+        try:
+            logger.info("Starting upload to remote server: %s (%s)", session.file_id, session.file_name)
+            
+            # Sử dụng temp_file_path (file đã rename, không có .part)
+            file_path = session.temp_file_path
+            if not file_path.exists():
+                logger.error("Temp file not found: %s", file_path)
+                session.status = "error"
+                await self.broadcast_to_session(session, {
+                    "event": "error",
+                    "fileId": session.file_id,
+                    "error": "File not found for remote upload"
+                })
+                return False
+            
+            # Kiểm tra file size
+            actual_size = file_path.stat().st_size
+            if actual_size != session.file_size:
+                logger.error("File size mismatch: expected=%d, actual=%d", session.file_size, actual_size)
+                session.status = "error"
+                await self.broadcast_to_session(session, {
+                    "event": "error",
+                    "fileId": session.file_id,
+                    "error": f"File size mismatch: expected {session.file_size}, got {actual_size}"
+                })
+                return False
+            
+            # Đổi status sang uploading khi bắt đầu remote upload
+            session.status = "uploading"
+            
+            # Cập nhật database status
+            if session.db_id:
+                db.update_file_status(session.db_id, "uploading")
+            
+            await self.broadcast_to_session(session, {
+                "event": "uploading",
+                "fileId": session.file_id,
+                "message": "Uploading to remote server..."
+            })
+            
+            # Chuẩn bị headers với user authentication
+            headers = {
+                'Content-Type': 'application/octet-stream',
+                'X-File-Name': session.file_name,
+                'X-File-Size': str(session.file_size),
+                'X-File-ID': session.file_id
+            }
+            
+            # Sử dụng user token thay vì REMOTE_SERVER_TOKEN
+            if session.user_token:
+                headers['Authorization'] = f'Bearer {session.user_token}'
+            else:
+                # Fallback to old token for backward compatibility
+                headers['Authorization'] = f'Bearer {REMOTE_SERVER_TOKEN}'
+            
+            # Gửi file đến remote server
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=None)) as http_session:
+                async with aiofiles.open(file_path, 'rb') as f:
+                    async with http_session.post(
+                        REMOTE_UPLOAD_URL,
+                        data=f,              # <— truyền file-like object, aiohttp sẽ stream
+                        headers=headers
+                    ) as response:
+                        if response.status == 200:
+                            result = await response.json()
+                            session.remote_file_id = result.get('file_id')
+                            session.status = "completed"
+                            
+                            # Cập nhật database status thành completed
+                            if session.db_id:
+                                # Lưu thông tin file path trong remote_uploads
+                                remote_file_path = f"{session.file_name}"  # Hoặc path từ result nếu có
+                                db.update_file_status(session.db_id, "completed", remote_file_path)
+                            
+                            logger.info("File uploaded to remote server successfully: %s, remote_id=%s", 
+                                    session.file_id, session.remote_file_id)
+                            
+                            # Thông báo cho client rằng file đã hoàn thành - gửi cả 2 events để đảm bảo
+                            await self.broadcast_to_session(session, {
+                                "event": "completed",
+                                "fileId": session.file_id,
+                                "remoteFileId": session.remote_file_id,
+                                "status": "completed"
+                            })
+                            
+                            # Gửi thêm complete-ack để đảm bảo frontend nhận được
+                            await self.broadcast_to_session(session, {
+                                "event": "complete-ack",
+                                "fileId": session.file_id,
+                                "remoteFileId": session.remote_file_id,
+                                "status": "completed"
+                            })
+                            
+                            return True
+                        else:
+                            error_text = await response.text()
+                            logger.error("Failed to upload to remote server: %s, status=%d, error=%s", 
+                                    session.file_id, response.status, error_text)
+                            session.status = "error"
+                            await self.broadcast_to_session(session, {
+                                "event": "error",
+                                "fileId": session.file_id,
+                                "error": f"Remote upload failed: HTTP {response.status}"
+                            })
+                            return False
+                
+                # Xóa file tạm sau khi đã đóng file handle
+                if session.status == "completed":
+                    try:
+                        # Thêm delay nhỏ để đảm bảo file handle đã được giải phóng
+                        await asyncio.sleep(0.1)
+                        file_path.unlink(missing_ok=True)  # Xóa file .part
+                        logger.debug("Temporary file deleted: %s", file_path)
+                    except Exception as e:
+                        logger.warning("Failed to delete temp file %s: %s", file_path, e)
+                        
+        except Exception as e:
+            logger.exception("Error uploading to remote server: %s", e)
+            session.status = "error"
+            await self.broadcast_to_session(session, {
+                "event": "error",
+                "fileId": session.file_id,
+                "error": f"Upload error: {str(e)}"
+            })
+            return False
+
+    async def handle_start(self, ws: WebSocketServerProtocol, payload: dict) -> None:
+        file_id = payload.get("fileId")
+        file_name = payload.get("fileName")
+        file_size = int(payload.get("fileSize", 0))
+        if not file_id or not file_name or file_size <= 0:
+            logger.warning("Invalid start payload: fileId=%s, fileName=%s, fileSize=%s", 
+                          file_id, file_name, file_size)
+            await self.send_error(ws, file_id, "Invalid start payload")
+            return
+
+        session = self.get_or_create_session(ws, file_id, file_name, file_size)
+        session.status = "active"
+
+        self.register_connection(ws)
+        self.connection_to_sessions[ws][file_id] = session
+
+        logger.info("Upload started: %s (%s), size=%d bytes, offset=%d", 
+                   file_id, file_name, file_size, session.bytes_received)
+
+        await self.send(ws, {
+            "event": "start-ack",
+            "fileId": session.file_id,
+            "offset": session.bytes_received,
+            "status": session.status,
+        })
+
+    async def handle_chunk(self, ws: WebSocketServerProtocol, payload: dict) -> None:
+        file_id = payload.get("fileId")
+        data_b64 = payload.get("data")
+        offset = int(payload.get("offset", -1))
+        if not file_id or data_b64 is None or offset < 0:
+            logger.warning("Invalid chunk payload: fileId=%s, offset=%s, data_length=%d", 
+                          file_id, offset, len(data_b64) if data_b64 else 0)
+            await self.send_error(ws, file_id, "Invalid chunk payload")
+            return
+
+        session = self.file_id_to_session.get(file_id)
+        if not session:
+            logger.warning("Chunk received for unknown session: %s", file_id)
+            await self.send_error(ws, file_id, "Session not found. Send start first.")
+            return
+
+        if session.status == "paused":
+            logger.debug("Chunk ignored - session paused: %s", file_id)
+            await self.send(ws, {"event": "paused", "fileId": file_id, "offset": session.bytes_received})
+            return
+        if session.status in ("stopped", "completed", "error", "uploading"):
+            logger.warning("Chunk rejected - invalid status: %s (%s)", file_id, session.status)
+            await self.send_error(ws, file_id, f"Cannot accept chunk in status: {session.status}")
+            return
+
+        expected = session.bytes_received
+        if offset != expected:
+            logger.warning("Offset mismatch: expected=%d, received=%d for %s", 
+                          expected, offset, file_id)
+            await self.send(ws, {
+                "event": "offset-mismatch",
+                "fileId": file_id,
+                "expected": expected,
+                "received": offset,
+            })
+            return
+
+        try:
+            data = base64.b64decode(data_b64)
+        except Exception as e:
+            logger.error("Failed to decode base64 data for %s: %s", file_id, e)
+            await self.send_error(ws, file_id, "Invalid base64 data")
+            return
+
+        # Write chunk to temp .part file
+        async with session.file_lock:
+            temp_path = session.temp_path()
+            temp_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            async with aiofiles.open(temp_path, 'ab') as f:
+                await f.write(data)
+                await f.flush()
+            
+            session.bytes_received += len(data)
+
+        percent = min(100.0 * session.bytes_received / max(session.file_size, 1), 100.0)
+        logger.debug("Chunk processed: %s, offset=%d, chunk_size=%d, progress=%.1f%%", 
+                    file_id, session.bytes_received, len(data), percent)
+        
+        # Gửi phản hồi xác nhận chunk đã được xử lý
+        await self.send(ws, {
+            "event": "chunk-ack",
+            "fileId": file_id,
+            "offset": session.bytes_received,
+            "receivedBytes": len(data),
+            "percent": round(percent, 2),
+        })
+        
+    
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Server stopped by user")
