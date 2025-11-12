@@ -483,4 +483,184 @@ def get_file_info(file_id):
         logger.error(f"Error getting file info: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/files/<int:file_id>/download', methods=['GET'])
+@login_required
+def download_file(file_id):
+    """Download file từ SQLite database với authentication"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({"error": "Authentication required"}), 401
+
+        logger.info(f"🔽 Download request for file {file_id} by user {current_user['username']} (ID: {current_user['id']})")
+        
+        file_info = db.get_file_by_id(file_id)
+        if not file_info:
+            logger.warning(f"File {file_id} not found in database")
+            return jsonify({"error": "File not found"}), 404
+
+        logger.info(f"🔽 File info: {file_info['original_filename']}, status: {file_info['status']}, path: {file_info['file_path']}")
+
+        # Kiểm tra quyền truy cập - user chỉ download file của mình, admin download tất cả
+        if current_user['role'] != 'admin' and file_info.get('user_id') != current_user['id']:
+            logger.warning(f"User {current_user['id']} attempted to download file {file_id} owned by user {file_info.get('user_id')}")
+            return jsonify({"error": "Permission denied"}), 403
+
+        # Chỉ cho phép download file đã completed
+        if file_info["status"] != "completed":
+            return jsonify({"error": "File not ready for download"}), 400
+        
+        if file_info["file_path"]:
+            # SECURITY FIX: Validate and sanitize file path to prevent path traversal
+            file_path = UPLOAD_FOLDER / file_info["file_path"]
+            
+            # CRITICAL: Ensure the resolved path is still within UPLOAD_FOLDER
+            try:
+                file_path = file_path.resolve()
+                upload_folder_resolved = UPLOAD_FOLDER.resolve()
+                
+                if not str(file_path).startswith(str(upload_folder_resolved)):
+                    logger.error(f"🚨 SECURITY: Path traversal attempt detected! Path: {file_path}")
+                    return jsonify({"error": "Access denied"}), 403
+                    
+            except Exception as e:
+                logger.error(f"🚨 SECURITY: Path resolution error: {e}")
+                return jsonify({"error": "Invalid file path"}), 400
+            
+            logger.info(f"🔽 Looking for file at: {file_path}")
+            
+            if file_path.exists():
+                logger.info(f"🔽 File found at original path, sending: {file_info['original_filename']}")
+                return send_file(
+                    file_path,
+                    as_attachment=True,
+                    download_name=file_info["original_filename"]
+                )
+            else:
+                # If original path fails, try searching in user folders
+                logger.info(f"🔽 File not found at original path, searching in user folders...")
+                filename = secure_filename(file_info["original_filename"])  # SECURITY: Re-sanitize
+                
+                # SECURITY FIX: Only search in the current user's folder
+                user_folder = UPLOAD_FOLDER / current_user['username']
+                if user_folder.exists() and user_folder.is_dir():
+                    potential_path = user_folder / filename
+                    potential_path = potential_path.resolve()
+                    
+                    # CRITICAL: Ensure the resolved path is still within user's folder
+                    if str(potential_path).startswith(str(user_folder.resolve())):
+                        logger.info(f"🔽 Checking: {potential_path}")
+                        if potential_path.exists():
+                            logger.info(f"🔽 File found in user folder, sending: {filename}")
+                            return send_file(
+                                potential_path,
+                                as_attachment=True,
+                                download_name=filename
+                            )
+                
+                logger.error(f"🔽 File not found: {filename}")
+                return jsonify({"error": "File not found on disk"}), 404
+        else:
+            logger.error(f"🔽 File path not available for file {file_id}")
+            return jsonify({"error": "File path not available"}), 404
+            
+    except Exception as e:
+        logger.error(f"Error downloading file {file_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/files/<int:file_id>/preview', methods=['GET'])
+@login_required
+def preview_file(file_id):
+    """Preview file - serve file for preview purposes"""
+    try:
+        user = get_current_user()
+        file_info = db.get_file_by_id(file_id)
+        
+        if not file_info:
+            return jsonify({"error": "File not found"}), 404
+            
+        # Check if user has permission to view this file
+        if file_info["user_id"] != user['id'] and user.get('role') != 'admin':
+            return jsonify({"error": "Permission denied"}), 403
+            
+        # Chỉ cho phép preview file đã completed
+        if file_info["status"] != "completed":
+            return jsonify({"error": "File not ready for preview"}), 400
+        
+        if file_info["file_path"]:
+            file_path = UPLOAD_FOLDER / file_info["file_path"]
+            if file_path.exists():
+                # Determine file type for appropriate headers
+                file_ext = file_path.suffix.lower()
+                
+                # Set appropriate MIME type
+                mime_types = {
+                    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+                    '.gif': 'image/gif', '.bmp': 'image/bmp', '.webp': 'image/webp',
+                    '.pdf': 'application/pdf', '.txt': 'text/plain',
+                    '.mp4': 'video/mp4', '.avi': 'video/avi', '.mov': 'video/quicktime',
+                    '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg'
+                }
+                
+                mimetype = mime_types.get(file_ext, 'application/octet-stream')
+                
+                return send_file(
+                    file_path,
+                    mimetype=mimetype,
+                    as_attachment=False,  # Display inline for preview
+                    download_name=file_info["original_filename"]
+                )
+            else:
+                return jsonify({"error": "File not found on disk"}), 404
+        else:
+            return jsonify({"error": "File path not available"}), 404
+            
+    except Exception as e:
+        logger.error(f"Error previewing file: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/files/<int:file_id>/info', methods=['GET'])
+@login_required
+def get_file_preview_info(file_id):
+    """Get file information for preview purposes"""
+    try:
+        user = get_current_user()
+        file_info = db.get_file_by_id(file_id)
+        
+        if not file_info:
+            return jsonify({"error": "File not found"}), 404
+            
+        # Check permissions
+        if file_info["user_id"] != user['id'] and user.get('role') != 'admin':
+            return jsonify({"error": "Permission denied"}), 403
+        
+        # Determine preview type based on file extension
+        file_ext = Path(file_info["original_filename"]).suffix.lower()
+        
+        preview_type = "download"  # default
+        if file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']:
+            preview_type = "image"
+        elif file_ext == '.pdf':
+            preview_type = "pdf"
+        elif file_ext in ['.mp4', '.avi', '.mov', '.webm']:
+            preview_type = "video"
+        elif file_ext in ['.mp3', '.wav', '.ogg']:
+            preview_type = "audio"
+        elif file_ext in ['.txt', '.md', '.csv']:
+            preview_type = "text"
+        
+        return jsonify({
+            "id": file_info["id"],
+            "name": file_info["original_filename"],
+            "size": file_info["size"],
+            "upload_time": file_info["created_at"],
+            "preview_type": preview_type,
+            "extension": file_ext,
+            "preview_url": f"/api/files/{file_id}/preview" if preview_type != "download" else None
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting file preview info: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
