@@ -615,7 +615,86 @@ class UploadManager:
             "percent": round(percent, 2),
         })
         
-    
+        # Kiểm tra nếu upload hoàn tất
+        if session.bytes_received >= session.file_size:
+            logger.info("Local upload completed: %s, finalizing file", file_id)
+            
+            # Đợi một chút để đảm bảo file được flush hoàn toàn
+            await asyncio.sleep(0.1)
+            
+            # Đổi status nhưng KHÔNG upload to remote ở đây
+            # Để handle_complete xử lý việc rename và upload
+            session.status = "completing"
+            await self.send(ws, {
+                "event": "local-complete", 
+                "fileId": file_id,
+                "message": "Local upload completed, finalizing..."
+            })
+
+    async def handle_pause(self, ws: WebSocketServerProtocol, payload: dict) -> None:
+        file_id = payload.get("fileId")
+        session = self.file_id_to_session.get(file_id)
+        if not session:
+            logger.warning("Pause requested for unknown session: %s", file_id)
+            await self.send_error(ws, file_id, "Session not found")
+            return
+        session.status = "paused"
+        
+        # Cập nhật database status
+        if session.db_id:
+            db.update_file_status(session.db_id, "paused")
+        
+        logger.info("Upload paused: %s (%s)", file_id, session.file_name)
+        await self.send(ws, {"event": "paused", "fileId": file_id, "offset": session.bytes_received})
+
+    async def handle_resume(self, ws: WebSocketServerProtocol, payload: dict) -> None:
+        file_id = payload.get("fileId")
+        session = self.file_id_to_session.get(file_id)
+        if not session:
+            logger.warning("Resume requested for unknown session: %s", file_id)
+            await self.send_error(ws, file_id, "Session not found")
+            return
+        session.status = "active"
+        
+        # Cập nhật database status
+        if session.db_id:
+            db.update_file_status(session.db_id, "uploading")
+        
+        logger.info("Upload resumed: %s (%s)", file_id, session.file_name)
+        await self.send(ws, {"event": "resume-ack", "fileId": file_id, "offset": session.bytes_received})
+
+    async def handle_stop(self, ws: WebSocketServerProtocol, payload: dict) -> None:
+        file_id = payload.get("fileId")
+        delete = bool(payload.get("delete", True))
+        session = self.file_id_to_session.get(file_id)
+        if not session:
+            logger.warning("Stop requested for unknown session: %s", file_id)
+            await self.send_error(ws, file_id, "Session not found")
+            return
+        session.status = "stopped"
+        logger.info("Upload stopped: %s (%s), delete=%s", file_id, session.file_name, delete)
+        
+        # Xóa file khỏi database nếu yêu cầu
+        if delete and session.db_id:
+            db.delete_file(session.db_id)
+            logger.info(f"File deleted from database: {file_id}")
+        
+        # Remove temp file if requested
+        temp_path = session.temp_path()
+        if delete and temp_path.exists():
+            try:
+                temp_path.unlink()
+                logger.debug("Temporary file deleted: %s", temp_path)
+            except Exception as exc:
+                logger.warning("Failed to delete temp file %s: %s", temp_path, exc)
+        
+        self.remove_session(file_id)
+        if ws in self.connection_to_sessions:
+            self.connection_to_sessions[ws].pop(file_id, None)
+        await self.send(ws, {"event": "stop-ack", "fileId": file_id})
+
+
+
 
 if __name__ == "__main__":
     try:
