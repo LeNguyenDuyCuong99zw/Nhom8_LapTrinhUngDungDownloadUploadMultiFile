@@ -1435,7 +1435,31 @@ def rename_file(file_id):
         logger.error(f"Error renaming file: {e}")
         return jsonify({'error': str(e)}), 500
 
-
+@app.route('/api/recycle-bin/<int:recycle_id>/delete', methods=['DELETE'])
+@login_required
+def permanently_delete_file(recycle_id):
+    """API xóa vĩnh viễn file từ thùng rác"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 401
+        
+        user_id = None if current_user.get('role') == 'admin' else current_user['id']
+        
+        success, file_path = db.permanently_delete_from_recycle(recycle_id, user_id)
+        if success:
+            # Xóa file vật lý
+            if file_path:
+                physical_path = UPLOAD_FOLDER / file_path
+                if physical_path.exists():
+                    physical_path.unlink()
+            
+            return jsonify({'success': True, 'message': 'File permanently deleted'})
+        else:
+            return jsonify({'error': 'Failed to delete file or file not found'}), 404
+    except Exception as e:
+        logger.error(f"Error permanently deleting file: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
