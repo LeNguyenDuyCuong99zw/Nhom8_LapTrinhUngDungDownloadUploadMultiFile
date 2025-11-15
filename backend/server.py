@@ -693,7 +693,225 @@ class UploadManager:
             self.connection_to_sessions[ws].pop(file_id, None)
         await self.send(ws, {"event": "stop-ack", "fileId": file_id})
 
+    async def handle_complete(self, ws: WebSocketServerProtocol, payload: dict) -> None:
+        file_id = payload.get("fileId")
+        session = self.file_id_to_session.get(file_id)
+        if not session:
+            logger.warning("Complete requested for unknown session: %s", file_id)
+            await self.send_error(ws, file_id, "Session not found")
+            return
 
+        # Validate size
+        if session.bytes_received != session.file_size:
+            logger.warning("Size mismatch for %s: expected=%d, actual=%d", 
+                          file_id, session.file_size, session.bytes_received)
+            await self.send_error(ws, file_id, "Size mismatch. Not completed.")
+            return
+
+        # Rename .part to final temp file
+        async with session.file_lock:
+            temp_path = session.temp_path()
+            if not temp_path.exists():
+                logger.error("Temporary file missing for %s: %s", file_id, temp_path)
+                await self.send_error(ws, file_id, "Temporary file missing")
+                return
+            
+            try:
+                final_temp_path = session.temp_file_path
+                temp_path.rename(final_temp_path)
+                logger.info("File completed locally: %s (%s) -> %s", 
+                           file_id, session.file_name, final_temp_path.name)
+                
+                # Bắt đầu upload lên remote server
+                success = await self.upload_to_remote_server(session)
+                
+                if success:
+                    await self.send(ws, {
+                        "event": "complete-ack",
+                        "fileId": file_id,
+                        "remoteFileId": session.remote_file_id,
+                        "status": "uploaded_to_remote"
+                    })
+                else:
+                    await self.send_error(ws, file_id, "Failed to upload to remote server")
+                    return
+                    
+            except Exception as exc:
+                session.status = "error"
+                logger.error("Failed to finalize upload %s: %s", file_id, exc)
+                await self.send_error(ws, file_id, f"Finalize failed: {exc}")
+                return
+        
+        # Cleanup session
+        self.remove_session(file_id)
+
+    async def send(self, ws: WebSocketServerProtocol, message: dict) -> None:
+        await ws.send(json.dumps(message))
+
+    async def send_error(self, ws: WebSocketServerProtocol, file_id: Optional[str], error: str) -> None:
+        payload = {"event": "error", "error": error}
+        if file_id:
+            payload["fileId"] = file_id
+        logger.error("Sending error to client: %s", error)
+        await ws.send(json.dumps(payload))
+
+
+manager = UploadManager()
+download_manager = DownloadManager()
+
+
+async def handler(ws: WebSocketServerProtocol, path: str) -> None:
+    # Accept any path but recommend "/ws"
+    # logger.debug("Client connected from %s path=%s", ws.remote_address, path)
+    # Register connection for per-connection session tracking
+    manager.register_connection(ws)
+    try:
+        async for message in ws:
+            # SECURITY FIX: Message size validation
+            if len(message) > 10 * 1024 * 1024:  # 10MB limit
+                logger.warning("Message too large from %s: %d bytes", ws.remote_address, len(message))
+                await manager.send_error(ws, None, "Message too large")
+                continue
+                
+            try:
+                data = json.loads(message)
+            except json.JSONDecodeError:
+                logger.warning("Invalid JSON received from %s: %s", ws.remote_address, message[:100])
+                await manager.send_error(ws, None, "Invalid JSON")
+                continue
+            
+            # SECURITY FIX: Message structure validation
+            if not isinstance(data, dict):
+                logger.warning("Invalid message format from %s", ws.remote_address)
+                await manager.send_error(ws, None, "Invalid message format")
+                continue
+
+            action = data.get("action")
+            message_type = data.get("type")  # For non-action messages like auth
+            logger.debug("Received action '%s' type '%s' from %s", action, message_type, ws.remote_address)
+            
+            # Handle authentication
+            if message_type == "auth":
+                token = data.get("token")
+                user = data.get("user")
+                
+                if manager.authenticate_connection(ws, token, user):
+                    await ws.send(json.dumps({
+                        'event': 'auth-success',
+                        'message': f'Authenticated as {user.get("username", "unknown")}'
+                    }))
+                else:
+                    await ws.send(json.dumps({
+                        'event': 'auth-error',
+                        'message': 'Authentication failed'
+                    }))
+                continue
+            
+            # Upload actions
+            if action == "start":
+                # Check authentication for uploads
+                auth_info = manager.get_connection_auth(ws)
+                if not auth_info['authenticated']:
+                    await ws.send(json.dumps({
+                        'event': 'error',
+                        'error': 'Authentication required for upload'
+                    }))
+                    continue
+                    
+                await manager.handle_start(ws, data)
+            elif action == "chunk":
+                await manager.handle_chunk(ws, data)
+            elif action == "pause":
+                await manager.handle_pause(ws, data)
+            elif action == "resume":
+                await manager.handle_resume(ws, data)
+            elif action == "stop":
+                await manager.handle_stop(ws, data)
+            elif action == "complete":
+                await manager.handle_complete(ws, data)
+            
+            # Download actions
+            elif action == "download-start":
+                url = data.get("url")
+                filename = data.get("filename")
+                file_id = data.get("fileId")
+                
+                if not url:
+                    await download_manager.send(ws, {
+                        'event': 'download-error',
+                        'fileId': file_id,
+                        'error': 'URL is required'
+                    })
+                    continue
+                
+                # Create download session
+                session = download_manager.create_session(url, filename)
+                # Use client's fileId for consistency
+                if file_id:
+                    old_id = session.session_id
+                    session.session_id = file_id
+                    download_manager.downloads[file_id] = session
+                    del download_manager.downloads[old_id]
+                
+                # Start download
+                success = await download_manager.start_download(session.session_id, ws)
+                if not success:
+                    await download_manager.send(ws, {
+                        'event': 'download-error',
+                        'fileId': session.session_id,
+                        'error': 'Failed to start download'
+                    })
+            
+            elif action == "download-pause":
+                file_id = data.get("fileId")
+                await download_manager.pause_download(file_id)
+                await download_manager.send(ws, {
+                    'event': 'download-pause-ack',
+                    'fileId': file_id
+                })
+            
+            elif action == "download-resume":
+                file_id = data.get("fileId")
+                success = await download_manager.resume_download(file_id, ws)
+                if success:
+                    await download_manager.send(ws, {
+                        'event': 'download-resume-ack',
+                        'fileId': file_id
+                    })
+                else:
+                    await download_manager.send(ws, {
+                        'event': 'download-error',
+                        'fileId': file_id,
+                        'error': 'Failed to resume download'
+                    })
+            
+            elif action == "download-stop":
+                file_id = data.get("fileId")
+                await download_manager.stop_download(file_id)
+                await download_manager.send(ws, {
+                    'event': 'download-stop-ack',
+                    'fileId': file_id
+                })
+            
+            else:
+                logger.warning("Unknown action '%s' from %s", action, ws.remote_address)
+                await manager.send_error(ws, data.get("fileId"), f"Unknown action: {action}")
+    except websockets.exceptions.ConnectionClosedError:
+        logger.info("Client disconnected abruptly: %s", ws.remote_address)
+    except Exception as exc:
+        logger.exception("Unhandled error from %s: %s", ws.remote_address, exc)
+    finally:
+        # Pause all active sessions tied to this connection to enable resume later
+        manager.unregister_connection(ws)
+        logger.info("Connection closed: %s", ws.remote_address)
+
+
+async def main() -> None:
+    host = os.environ.get("WS_HOST", "localhost")
+    port = int(os.environ.get("WS_PORT", "8765"))
+    async with websockets.serve(handler, host, port, origins=None, max_size=8 * 1024 * 1024):  # 8 MB frame
+        logger.info("WebSocket server listening on ws://%s:%d", host, port)
+        await asyncio.Future()  # run forever
 
 
 if __name__ == "__main__":
