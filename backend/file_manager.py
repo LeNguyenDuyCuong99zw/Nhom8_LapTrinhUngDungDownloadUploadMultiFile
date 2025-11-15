@@ -1044,3 +1044,177 @@ def move_file_to_folder(file_id):
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
+# ============ ADMIN API ROUTES ============
+
+@app.route('/api/admin/stats', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_stats():
+    """API lấy thống kê tổng quan cho admin"""
+    try:
+        # Lấy tất cả users
+        users = auth_db.get_all_users()
+        
+        # Lấy tất cả files
+        all_files = db.get_all_files()
+        
+        # Tính toán stats
+        total_users = len(users)
+        total_files = len(all_files)
+        total_size = sum(f.get('size', 0) or 0 for f in all_files if f.get('status') == 'completed')
+        
+        # Files upload hôm nay
+        from datetime import datetime, date
+        today = date.today().isoformat()
+        today_uploads = len([f for f in all_files if f.get('created_at', '').startswith(today)])
+        
+        return jsonify({
+            'total_users': total_users,
+            'total_files': total_files,
+            'total_size': total_size,
+            'today_uploads': today_uploads,
+            'active_users': len([u for u in users if u.get('last_login')]),
+            'completed_files': len([f for f in all_files if f.get('status') == 'completed'])
+        })
+    except Exception as e:
+        logger.error(f"Error getting admin stats: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_users():
+    """API lấy danh sách tất cả users cho admin"""
+    try:
+        users = auth_db.get_all_users()
+        return jsonify(users)
+    except Exception as e:
+        logger.error(f"Error getting users: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users', methods=['POST'])
+@login_required
+@admin_required
+def admin_create_user():
+    """API tạo user mới cho admin"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        role = data.get('role', 'user')
+        
+        if not username or not password:
+            return jsonify({'error': 'Username and password required'}), 400
+        
+        if role not in ['user', 'admin']:
+            return jsonify({'error': 'Invalid role'}), 400
+        
+        user_id = auth_db.create_user(username, password, role)
+        if user_id:
+            return jsonify({
+                'success': True,
+                'user_id': user_id,
+                'message': 'User created successfully'
+            })
+        else:
+            return jsonify({'error': 'Username already exists'}), 409
+    except Exception as e:
+        logger.error(f"Error creating user: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_user(user_id):
+    """API xóa user cho admin"""
+    try:
+        current_user = get_current_user()
+        if current_user['id'] == user_id:
+            return jsonify({'error': 'Cannot delete yourself'}), 400
+        
+        success = auth_db.delete_user(user_id)
+        if success:
+            return jsonify({'success': True, 'message': 'User deleted successfully'})
+        else:
+            return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        logger.error(f"Error deleting user: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+@admin_required
+def admin_reset_password(user_id):
+    """API reset password cho admin"""
+    try:
+        data = request.get_json()
+        new_password = data.get('password')
+        
+        if not new_password:
+            return jsonify({'error': 'New password required'}), 400
+        
+        success = auth_db.reset_password(user_id, new_password)
+        if success:
+            return jsonify({'success': True, 'message': 'Password reset successfully'})
+        else:
+            return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        logger.error(f"Error resetting password: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/files', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_files():
+    """API lấy danh sách tất cả files cho admin"""
+    try:
+        all_files = db.get_all_files()
+        
+        # Lấy thông tin user cho mỗi file
+        users = {user['id']: user for user in auth_db.get_all_users()}
+        
+        # Thêm username vào file info
+        for file in all_files:
+            user_id = file.get('user_id')
+            if user_id and user_id in users:
+                file['username'] = users[user_id]['username']
+            else:
+                file['username'] = 'Unknown'
+        
+        return jsonify(all_files)
+    except Exception as e:
+        logger.error(f"Error getting admin files: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/files/<int:file_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_file(file_id):
+    """API xóa file cho admin - di chuyển vào recycle bin"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            logger.error("❌ Current user not found in admin_delete_file")
+            return jsonify({'error': 'User not found'}), 401
+        
+        logger.info(f"🗑️ ADMIN DELETE FILE - User: {current_user['username']} (ID: {current_user['id']}) deleting file ID: {file_id}")
+        
+        # Di chuyển file vào recycle bin thay vì xóa ngay
+        success = db.move_to_recycle_bin(file_id, current_user['id'], days_to_keep=30)
+        if success:
+            logger.info(f"✅ File {file_id} moved to recycle bin successfully by admin {current_user['username']}")
+            return jsonify({'success': True, 'message': 'File moved to recycle bin successfully'})
+        else:
+            logger.error(f"❌ Failed to move file {file_id} to recycle bin")
+            return jsonify({'error': 'Failed to move file to recycle bin'}), 500
+    except Exception as e:
+        logger.error(f"Error moving admin file to recycle bin: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/test-simple')
+def test_simple():
+    logger.info("🔥 SIMPLE TEST ENDPOINT HIT!")
+    return "TEST OK!"
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
