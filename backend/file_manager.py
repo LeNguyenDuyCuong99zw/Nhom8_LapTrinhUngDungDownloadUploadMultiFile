@@ -1216,7 +1216,227 @@ def test_simple():
     logger.info("🔥 SIMPLE TEST ENDPOINT HIT!")
     return "TEST OK!"
 
+# ==================== RECYCLE BIN API ENDPOINTS ====================
+
+@app.route('/api/recycle-bin/test', methods=['GET'])
+def test_recycle_bin():
+    """Test endpoint để kiểm tra recycle bin"""
+    try:
+        logger.info("🧪 TEST RECYCLE BIN ENDPOINT CALLED")
+        
+        # Test database connection
+        with sqlite3.connect(db.db_path) as conn:
+            cursor = conn.execute("SELECT COUNT(*) FROM recycle_bin")
+            total_count = cursor.fetchone()[0]
+            
+            cursor = conn.execute("SELECT COUNT(*) FROM recycle_bin WHERE status = 'in_recycle'")
+            active_count = cursor.fetchone()[0]
+            
+            # Get sample data
+            cursor = conn.execute("""
+                SELECT id, original_filename, user_id, deleted_at
+                FROM recycle_bin 
+                WHERE status = 'in_recycle'
+                ORDER BY deleted_at DESC
+                LIMIT 3
+            """)
+            sample_files = cursor.fetchall()
+        
+        result = {
+            'success': True,
+            'total_files_in_recycle': total_count,
+            'active_files_in_recycle': active_count,
+            'sample_files': [
+                {
+                    'id': f[0],
+                    'filename': f[1], 
+                    'user_id': f[2],
+                    'deleted_at': f[3]
+                } for f in sample_files
+            ]
+        }
+        
+        logger.info(f"🧪 TEST RESULT: {result}")
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"🧪 TEST ERROR: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/recycle-bin', methods=['GET'])
+@login_required
+def get_recycle_bin():
+    """API lấy danh sách file trong thùng rác của user"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            logger.error("❌ Current user not found in get_recycle_bin")
+            return jsonify({'error': 'User not found'}), 401
+        
+        logger.info(f"🗑️ GET RECYCLE BIN - User: {current_user['username']} (ID: {current_user['id']}) Role: {current_user.get('role', 'user')}")
+        
+        # Admin có thể xem tất cả files, user chỉ xem của mình
+        if current_user.get('role') == 'admin':
+            files = db.get_recycle_bin_files()  # Admin xem tất cả
+            logger.info(f"🗑️ ADMIN - Found {len(files)} total files in recycle bin")
+        else:
+            files = db.get_recycle_bin_files(current_user['id'])  # User xem của mình
+            logger.info(f"🗑️ USER - Found {len(files)} files in recycle bin for user {current_user['id']}")
+        
+        for file in files:
+            logger.info(f"  - File: {file['original_filename']} (ID: {file['id']}) Owner: {file.get('user_id', 'Unknown')}")
+        
+        return jsonify({'files': files})
+    except Exception as e:
+        logger.error(f"Error getting recycle bin: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/recycle-bin', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_recycle_bin():
+    """API admin lấy tất cả file trong thùng rác"""
+    try:
+        files = db.get_recycle_bin_files()  # Admin thấy tất cả
+        return jsonify({'files': files})
+    except Exception as e:
+        logger.error(f"Error getting admin recycle bin: {e}")
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/api/recycle-bin/<int:recycle_id>/restore', methods=['POST'])
+@login_required
+def restore_file(recycle_id):
+    """API khôi phục file từ thùng rác"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 401
+        user_id = None if current_user.get('role') == 'admin' else current_user['id']
+        
+        success = db.restore_from_recycle_bin(recycle_id, user_id)
+        if success:
+            return jsonify({'success': True, 'message': 'File restored successfully'})
+        else:
+            return jsonify({'error': 'Failed to restore file or file not found'}), 404
+    except Exception as e:
+        logger.error(f"Error restoring file: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/files/<int:file_id>', methods=['DELETE'])
+@login_required
+def delete_user_file(file_id):
+    """API xóa file của user - di chuyển vào recycle bin"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 401
+        
+        # Kiểm tra quyền sở hữu file
+        file_info = db.get_file_by_id(file_id)
+        if not file_info:
+            return jsonify({'error': 'File not found'}), 404
+        
+        # User chỉ có thể xóa file của mình, admin xóa được tất cả
+        if current_user.get('role') != 'admin' and file_info.get('user_id') != current_user['id']:
+            return jsonify({'error': 'Permission denied'}), 403
+        
+        # Di chuyển file vào recycle bin
+        success = db.move_to_recycle_bin(file_id, current_user['id'], days_to_keep=7)  # User file giữ 7 ngày
+        if success:
+            return jsonify({'success': True, 'message': 'File moved to recycle bin successfully'})
+        else:
+            return jsonify({'error': 'Failed to move file to recycle bin'}), 500
+    except Exception as e:
+        logger.error(f"Error moving user file to recycle bin: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/files/<int:file_id>/rename', methods=['PATCH'])
+@login_required
+def rename_file(file_id):
+    """API đổi tên file"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 401
+        
+        # Lấy dữ liệu từ request
+        data = request.get_json()
+        new_name = data.get('new_name', '').strip()
+        
+        if not new_name:
+            return jsonify({'error': 'New file name is required'}), 400
+        
+        # Validate tên file
+        invalid_chars = r'[<>:"/\\|?*]'
+        if re.search(invalid_chars, new_name):
+            return jsonify({'error': 'Invalid characters in file name: < > : " / \\ | ? *'}), 400
+        
+        # Kiểm tra quyền sở hữu file
+        file_info = db.get_file_by_id(file_id)
+        if not file_info:
+            return jsonify({'error': 'File not found'}), 404
+        
+        # User chỉ có thể đổi tên file của mình, admin có thể đổi tên tất cả
+        if current_user.get('role') != 'admin' and file_info.get('user_id') != current_user['id']:
+            return jsonify({'error': 'Permission denied'}), 403
+        
+        # Lấy đường dẫn file hiện tại
+        old_file_path = UPLOAD_FOLDER / file_info['file_path']
+        old_name = file_info['original_filename']
+        
+        logger.info(f"🔧 Rename file ID {file_id}: '{old_name}' -> '{new_name}'")
+        
+        # Tạo tên file mới với extension cũ nếu có
+        old_name_parts = old_name.rsplit('.', 1)
+        if len(old_name_parts) > 1:
+            old_extension = old_name_parts[1]
+            new_name_parts = new_name.rsplit('.', 1)
+            if len(new_name_parts) == 1 or new_name_parts[1] != old_extension:
+                new_name = f"{new_name}.{old_extension}"
+        
+        # Tạo đường dẫn file mới
+        directory = old_file_path.parent
+        new_file_path = directory / new_name
+        
+        # Nếu tên mới khác tên cũ, kiểm tra trùng lặp
+        if str(old_file_path).lower() != str(new_file_path).lower():
+            if new_file_path.exists():
+                return jsonify({'error': 'A file with this name already exists'}), 409
+            
+            user_files = db.get_user_files(current_user['id'])
+            for user_file in user_files:
+                if (user_file['id'] != file_id and 
+                    user_file['original_filename'].lower() == new_name.lower()):
+                    return jsonify({'error': 'A file with this name already exists'}), 409
+        
+        # Đổi tên file vật lý
+        if old_file_path.exists():
+            old_file_path.rename(new_file_path)
+        
+        # Cập nhật database
+        relative_new_path = str(new_file_path.relative_to(UPLOAD_FOLDER))
+        relative_new_path_normalized = relative_new_path.replace('\\', '/')
+        
+        success = db.update_file_name(file_id, new_name, relative_new_path_normalized)
+        
+        if success:
+            return jsonify({
+                'success': True, 
+                'message': 'File renamed successfully',
+                'new_name': new_name,
+                'new_path': relative_new_path_normalized
+            })
+        else:
+            if new_file_path.exists():
+                new_file_path.rename(old_file_path)
+            return jsonify({'error': 'Failed to update database'}), 500
+            
+    except Exception as e:
+        logger.error(f"Error renaming file: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+3505
