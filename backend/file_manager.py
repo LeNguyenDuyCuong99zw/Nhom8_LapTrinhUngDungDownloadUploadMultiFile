@@ -267,170 +267,171 @@ def get_user_info():
     user = get_current_user()
     return jsonify({'user': user})
 
-@app.route('/api/upload', methods=['POST'])
-@login_required
-def upload_file():
-    """API endpoint để nhận file từ WebSocket server với user context"""
-    try:
-        user = get_current_user()
-        logger.info(f"Upload request from user: {user['id']} ({user['username']})")
+# @app.route('/api/upload', methods=['POST'])
+# @login_required
+# def upload_file():
+#     """API endpoint để nhận file từ WebSocket server với user context"""
+#     try:
+#         user = get_current_user()
+#         logger.info(f"Upload request from user: {user['id']} ({user['username']})")
         
-        # Lấy thông tin từ headers
-        file_name = request.headers.get('X-File-Name')
-        file_size = int(request.headers.get('X-File-Size', 0))
-        file_id = request.headers.get('X-File-ID')
-        folder_id = request.headers.get('X-Folder-ID')  # Optional folder
+#         # Lấy thông tin từ headers
+#         file_name = request.headers.get('X-File-Name')
+#         file_size = int(request.headers.get('X-File-Size', 0))
+#         file_id = request.headers.get('X-File-ID')
+#         folder_id = request.headers.get('X-Folder-ID')  # Optional folder
         
-        logger.info(f"Upload file: {file_name}, size: {file_size}, id: {file_id}")
+#         logger.info(f"Upload file: {file_name}, size: {file_size}, id: {file_id}")
         
-        if not file_name or not file_size or not file_id:
-            return jsonify({"error": "Missing required headers"}), 400
+#         if not file_name or not file_size or not file_id:
+#             return jsonify({"error": "Missing required headers"}), 400
         
-        # Tạo tên file an toàn
-        safe_filename = secure_filename(file_name)
+#         # Tạo tên file an toàn
+#         safe_filename = secure_filename(file_name)
         
-        # Tạo đường dẫn file với user folder (sử dụng username thay vì user_id)
-        user_folder = UPLOAD_FOLDER / user['username']
-        user_folder.mkdir(exist_ok=True)
-        file_path = user_folder / safe_filename
+#         # Tạo đường dẫn file với user folder (sử dụng username thay vì user_id)
+#         user_folder = UPLOAD_FOLDER / user['username']
+#         user_folder.mkdir(exist_ok=True)
+#         file_path = user_folder / safe_filename
         
-        # Xử lý trùng tên file
-        counter = 1
-        original_name = file_path.stem
-        original_ext = file_path.suffix
-        while file_path.exists():
-            file_path = user_folder / f"{original_name} ({counter}){original_ext}"
-            counter += 1
+#         # Xử lý trùng tên file
+#         counter = 1
+#         original_name = file_path.stem
+#         original_ext = file_path.suffix
+#         while file_path.exists():
+#             file_path = user_folder / f"{original_name} ({counter}){original_ext}"
+#             counter += 1
         
-        # Lưu file
-        with open(file_path, 'wb') as f:
-            chunk_size = 1024 * 1024  # 1MB
-            while True:
-                chunk = request.stream.read(chunk_size)
-                if not chunk:
-                    break
-                f.write(chunk)
+#         # Lưu file
+#         with open(file_path, 'wb') as f:
+#             chunk_size = 1024 * 1024  # 1MB
+#             while True:
+#                 chunk = request.stream.read(chunk_size)
+#                 if not chunk:
+#                     break
+#                 f.write(chunk)
 
-        # Lưu thông tin file vào SQLite database với user_id
-        try:
-            file_db_id = db.add_file(
-                filename=safe_filename,
-                original_filename=file_name,
-                size=file_size,
-                uploader=user['username'],
-                user_id=user['id'],
-                folder_id=folder_id,
-                temp_path=None  # File đã hoàn tất, không còn ở temp
-            )
+#         # Lưu thông tin file vào SQLite database với user_id
+#         try:
+#             file_db_id = db.add_file(
+#                 filename = safe_filename,
+#                 original_filename=file_name,
+#                 size = file_size,
+#                 uploader = user['username'],
+#                 user_id = user['id'],
+#                 folder_id = folder_id,
+#                 temp_path = None  # File đã hoàn tất, không còn ở temp nữa
+#             )
             
-            # Cập nhật status thành completed và lưu file_path tương đối
-            # Lấy tên file cuối cùng sau khi xử lý duplicate
-            final_filename = file_path.name
-            relative_file_path = f"{user['username']}/{final_filename}"
+#             # Lấy tên file cuối cùng sau khi xử lý duplicate
+#             final_filename = file_path.name
+#             relative_file_path = f"{user['username']}/{final_filename}"
             
-            db.update_file_status(
-                file_id=file_db_id,
-                status="completed",
-                file_path=relative_file_path
-            )
+#             # Cập lại file trong database
+#             db.update_file_status(
+#                 file_id = file_db_id,
+#                 status = "completed",
+#                 file_path = relative_file_path
+#             )
             
-            logger.info(f"File uploaded successfully: {file_name} -> {file_path} (DB ID: {file_db_id})")
+#             #Log thông báo thành công
+#             logger.info(f"File uploaded successfully: {file_name} -> {file_path} (DB ID: {file_db_id})")
             
-            return jsonify({
-                "success": True,
-                "file_id": file_db_id,
-                "message": "File uploaded successfully"
-            })
+#             return jsonify({
+#                 "success": True,
+#                 "file_id": file_db_id,
+#                 "message": "File uploaded successfully"
+#             })
             
-        except Exception as db_error:
-            # Nếu lỗi database, xóa file đã tạo
-            if file_path.exists():
-                file_path.unlink()
-            logger.error(f"Database error: {db_error}")
-            return jsonify({"error": "Database error"}), 500
-    except Exception as e:
-        logger.error(f"Error uploading file: {e}")
-        return jsonify({"error": str(e)}), 500
+#         except Exception as db_error:
+#             # Nếu lỗi database, xóa file đã tạo
+#             if file_path.exists():
+#                 file_path.unlink()
+#             logger.error(f"Database error: {db_error}")
+#             return jsonify({"error": "Database error"}), 500
+#     except Exception as e:
+#         logger.error(f"Error uploading file: {e}")
+#         return jsonify({"error": str(e)}), 500
 
-def cleanup_stuck_uploads(user_id):
-    """Clean up files stuck in uploading status for more than 30 minutes"""
-    try:
-        cutoff_time = datetime.now() - timedelta(minutes=30)
+# def cleanup_stuck_uploads(user_id):
+#     """Clean up files stuck in uploading status for more than 30 minutes"""
+#     try:
+#         cutoff_time = datetime.now() - timedelta(minutes=30)
         
-        # Get files stuck in uploading status
-        with sqlite3.connect(db.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, filename FROM files 
-                WHERE user_id = ? AND status = 'uploading' 
-                AND datetime(created_at) < datetime(?)
-            """, (user_id, cutoff_time.isoformat()))
+#         # Get files stuck in uploading status
+#         with sqlite3.connect(db.db_path) as conn:
+#             cursor = conn.cursor()
+#             cursor.execute("""
+#                 SELECT id, filename FROM files 
+#                 WHERE user_id = ? AND status = 'uploading' 
+#                 AND datetime(created_at) < datetime(?)
+#             """, (user_id, cutoff_time.isoformat()))
             
-            stuck_files = cursor.fetchall()
+#             stuck_files = cursor.fetchall()
             
-            if stuck_files:
-                logger.info(f"🧹 Found {len(stuck_files)} stuck uploads for user {user_id}, cleaning up...")
+#             if stuck_files:
+#                 logger.info(f"🧹 Found {len(stuck_files)} stuck uploads for user {user_id}, cleaning up...")
                 
-                # Delete stuck uploads
-                for file_id, filename in stuck_files:
-                    cursor.execute("DELETE FROM files WHERE id = ?", (file_id,))
-                    logger.info(f"  Deleted stuck upload: {filename}")
+#                 # Delete stuck uploads
+#                 for file_id, filename in stuck_files:
+#                     cursor.execute("DELETE FROM files WHERE id = ?", (file_id,))
+#                     logger.info(f"  Deleted stuck upload: {filename}")
                 
-                conn.commit()
-                logger.info(f"✅ Cleaned up {len(stuck_files)} stuck uploads")
+#                 conn.commit()
+#                 logger.info(f"✅ Cleaned up {len(stuck_files)} stuck uploads")
         
-    except Exception as e:
-        logger.error(f"Error cleaning up stuck uploads: {e}")
+#     except Exception as e:
+#         logger.error(f"Error cleaning up stuck uploads: {e}")
 
-@app.route('/api/files', methods=['GET'])
-@login_required
-def get_files():
-    """Lấy danh sách files của user hiện tại từ SQLite database"""
-    try:
-        user = get_current_user()
-        logger.info(f"🔍 API /api/files called by user: {user['id']} ({user['username']})")
+# @app.route('/api/files', methods=['GET'])
+# @login_required
+# def get_files():
+#     """Lấy danh sách files của user hiện tại từ SQLite database"""
+#     try:
+#         user = get_current_user()
+#         logger.info(f"🔍 API /api/files called by user: {user['id']} ({user['username']})")
         
-        # FIX: Clean up stuck uploads before returning files
-        cleanup_stuck_uploads(user['id'])
+#         # FIX: Clean up stuck uploads before returning files
+#         cleanup_stuck_uploads(user['id'])
         
-        # Lấy tham số query
-        status = request.args.get('status')  # completed, uploading, paused
-        limit = request.args.get('limit', type=int)
-        offset = request.args.get('offset', 0, type=int)
+#         # Lấy tham số query
+#         status = request.args.get('status')  # completed, uploading, paused
+#         limit = request.args.get('limit', type=int)
+#         offset = request.args.get('offset', 0, type=int)
         
-        # Lấy files của user từ database
-        files = db.get_user_files(user['id'], status=status)
-        logger.info(f"📁 Found {len(files)} files for user {user['id']}")
+#         # Lấy files của user từ database
+#         files = db.get_user_files(user['id'], status=status)
+#         logger.info(f"📁 Found {len(files)} files for user {user['id']}")
         
-        # Log first few files for debugging
-        for i, f in enumerate(files[:3]):
-            logger.info(f"  File {i+1}: {f['original_filename']} (Status: {f['status']}, Path: {f.get('file_path', 'NULL')})")
+#         # Log first few files for debugging
+#         for i, f in enumerate(files[:3]):
+#             logger.info(f"  File {i+1}: {f['original_filename']} (Status: {f['status']}, Path: {f.get('file_path', 'NULL')})")
         
-        # Convert format cho frontend compatibility
-        formatted_files = []
-        for file in files:
-            # Normalize file path separators cho consistency
-            normalized_path = file["file_path"].replace('\\', '/') if file["file_path"] else None
+#         # Convert format cho frontend compatibility
+#         formatted_files = []
+#         for file in files:
+#             # Normalize file path separators cho consistency
+#             normalized_path = file["file_path"].replace('\\', '/') if file["file_path"] else None
             
-            formatted_files.append({
-                "id": file["id"],
-                "name": file["original_filename"],
-                "filename": file["original_filename"],
-                "file_path": normalized_path,
-                "folder_id": file.get("folder_id"),
-                "size": file["size"],
-                "upload_time": file["created_at"],
-                "status": file["status"],
-                "uploader": file["uploader"],
-                "user_id": file["user_id"],
-                "type": "file"
-            })
+#             formatted_files.append({
+#                 "id": file["id"],
+#                 "name": file["original_filename"],
+#                 "filename": file["original_filename"],
+#                 "file_path": normalized_path,
+#                 "folder_id": file.get("folder_id"),
+#                 "size": file["size"],
+#                 "upload_time": file["created_at"],
+#                 "status": file["status"],
+#                 "uploader": file["uploader"],
+#                 "user_id": file["user_id"],
+#                 "type": "file"
+#             })
         
-        logger.info(f"✅ Returning {len(formatted_files)} formatted files to frontend")
-        return jsonify(formatted_files)
-    except Exception as e:
-        logger.error(f"Error getting files: {e}")
-        return jsonify({"error": str(e)}), 500
+#         logger.info(f"✅ Returning {len(formatted_files)} formatted files to frontend")
+#         return jsonify(formatted_files)
+#     except Exception as e:
+#         logger.error(f"Error getting files: {e}")
+#         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/folders', methods=['GET'])
 @login_required
@@ -461,112 +462,112 @@ def get_folders():
         logger.error(f"Error getting folders: {e}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/files/<int:file_id>', methods=['GET'])
-def get_file_info(file_id):
-    """Lấy thông tin chi tiết của file từ SQLite database"""
-    try:
-        file_info = db.get_file_by_id(file_id)
-        if file_info:
-            # Format để tương thích với frontend
-            formatted_info = {
-                "id": file_info["id"],
-                "name": file_info["original_filename"],
-                "path": file_info["file_path"] or "",
-                "size": file_info["size"],
-                "upload_time": file_info["created_at"],
-                "status": file_info["status"],
-                "type": "file"
-            }
-            return jsonify(formatted_info)
-        return jsonify({"error": "File not found"}), 404
-    except Exception as e:
-        logger.error(f"Error getting file info: {e}")
-        return jsonify({"error": str(e)}), 500
+# @app.route('/api/files/<int:file_id>', methods=['GET'])
+# def get_file_info(file_id):
+#     """Lấy thông tin chi tiết của file từ SQLite database"""
+#     try:
+#         file_info = db.get_file_by_id(file_id)
+#         if file_info:
+#             # Format để tương thích với frontend
+#             formatted_info = {
+#                 "id": file_info["id"],
+#                 "name": file_info["original_filename"],
+#                 "path": file_info["file_path"] or "",
+#                 "size": file_info["size"],
+#                 "upload_time": file_info["created_at"],
+#                 "status": file_info["status"],
+#                 "type": "file"
+#             }
+#             return jsonify(formatted_info)
+#         return jsonify({"error": "File not found"}), 404
+#     except Exception as e:
+#         logger.error(f"Error getting file info: {e}")
+#         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/files/<int:file_id>/download', methods=['GET'])
-@login_required
-def download_file(file_id):
-    """Download file từ SQLite database với authentication"""
-    try:
-        current_user = get_current_user()
-        if not current_user:
-            return jsonify({"error": "Authentication required"}), 401
+# @app.route('/api/files/<int:file_id>/download', methods=['GET'])
+# @login_required
+# def download_file(file_id):
+#     """Download file từ SQLite database với authentication"""
+#     try:
+#         current_user = get_current_user()
+#         if not current_user:
+#             return jsonify({"error": "Authentication required"}), 401
 
-        logger.info(f"🔽 Download request for file {file_id} by user {current_user['username']} (ID: {current_user['id']})")
+#         logger.info(f"🔽 Download request for file {file_id} by user {current_user['username']} (ID: {current_user['id']})")
         
-        file_info = db.get_file_by_id(file_id)
-        if not file_info:
-            logger.warning(f"File {file_id} not found in database")
-            return jsonify({"error": "File not found"}), 404
+#         file_info = db.get_file_by_id(file_id)
+#         if not file_info:
+#             logger.warning(f"File {file_id} not found in database")
+#             return jsonify({"error": "File not found"}), 404
 
-        logger.info(f"🔽 File info: {file_info['original_filename']}, status: {file_info['status']}, path: {file_info['file_path']}")
+#         logger.info(f"🔽 File info: {file_info['original_filename']}, status: {file_info['status']}, path: {file_info['file_path']}")
 
-        # Kiểm tra quyền truy cập - user chỉ download file của mình, admin download tất cả
-        if current_user['role'] != 'admin' and file_info.get('user_id') != current_user['id']:
-            logger.warning(f"User {current_user['id']} attempted to download file {file_id} owned by user {file_info.get('user_id')}")
-            return jsonify({"error": "Permission denied"}), 403
+#         # Kiểm tra quyền truy cập - user chỉ download file của mình, admin download tất cả
+#         if current_user['role'] != 'admin' and file_info.get('user_id') != current_user['id']:
+#             logger.warning(f"User {current_user['id']} attempted to download file {file_id} owned by user {file_info.get('user_id')}")
+#             return jsonify({"error": "Permission denied"}), 403
 
-        # Chỉ cho phép download file đã completed
-        if file_info["status"] != "completed":
-            return jsonify({"error": "File not ready for download"}), 400
+#         # Chỉ cho phép download file đã completed
+#         if file_info["status"] != "completed":
+#             return jsonify({"error": "File not ready for download"}), 400
         
-        if file_info["file_path"]:
-            # SECURITY FIX: Validate and sanitize file path to prevent path traversal
-            file_path = UPLOAD_FOLDER / file_info["file_path"]
+#         if file_info["file_path"]:
+#             # SECURITY FIX: Validate and sanitize file path to prevent path traversal
+#             file_path = UPLOAD_FOLDER / file_info["file_path"]
             
-            # CRITICAL: Ensure the resolved path is still within UPLOAD_FOLDER
-            try:
-                file_path = file_path.resolve()
-                upload_folder_resolved = UPLOAD_FOLDER.resolve()
+#             # CRITICAL: Ensure the resolved path is still within UPLOAD_FOLDER
+#             try:
+#                 file_path = file_path.resolve()
+#                 upload_folder_resolved = UPLOAD_FOLDER.resolve()
                 
-                if not str(file_path).startswith(str(upload_folder_resolved)):
-                    logger.error(f"🚨 SECURITY: Path traversal attempt detected! Path: {file_path}")
-                    return jsonify({"error": "Access denied"}), 403
+#                 if not str(file_path).startswith(str(upload_folder_resolved)):
+#                     logger.error(f"🚨 SECURITY: Path traversal attempt detected! Path: {file_path}")
+#                     return jsonify({"error": "Access denied"}), 403
                     
-            except Exception as e:
-                logger.error(f"🚨 SECURITY: Path resolution error: {e}")
-                return jsonify({"error": "Invalid file path"}), 400
+#             except Exception as e:
+#                 logger.error(f"🚨 SECURITY: Path resolution error: {e}")
+#                 return jsonify({"error": "Invalid file path"}), 400
             
-            logger.info(f"🔽 Looking for file at: {file_path}")
+#             logger.info(f"🔽 Looking for file at: {file_path}")
             
-            if file_path.exists():
-                logger.info(f"🔽 File found at original path, sending: {file_info['original_filename']}")
-                return send_file(
-                    file_path,
-                    as_attachment=True,
-                    download_name=file_info["original_filename"]
-                )
-            else:
-                # If original path fails, try searching in user folders
-                logger.info(f"🔽 File not found at original path, searching in user folders...")
-                filename = secure_filename(file_info["original_filename"])  # SECURITY: Re-sanitize
+#             if file_path.exists():
+#                 logger.info(f"🔽 File found at original path, sending: {file_info['original_filename']}")
+#                 return send_file(
+#                     file_path,
+#                     as_attachment=True,
+#                     download_name=file_info["original_filename"]
+#                 )
+#             else:
+#                 # If original path fails, try searching in user folders
+#                 logger.info(f"🔽 File not found at original path, searching in user folders...")
+#                 filename = secure_filename(file_info["original_filename"])  # SECURITY: Re-sanitize
                 
-                # SECURITY FIX: Only search in the current user's folder
-                user_folder = UPLOAD_FOLDER / current_user['username']
-                if user_folder.exists() and user_folder.is_dir():
-                    potential_path = user_folder / filename
-                    potential_path = potential_path.resolve()
+#                 # SECURITY FIX: Only search in the current user's folder
+#                 user_folder = UPLOAD_FOLDER / current_user['username']
+#                 if user_folder.exists() and user_folder.is_dir():
+#                     potential_path = user_folder / filename
+#                     potential_path = potential_path.resolve()
                     
-                    # CRITICAL: Ensure the resolved path is still within user's folder
-                    if str(potential_path).startswith(str(user_folder.resolve())):
-                        logger.info(f"🔽 Checking: {potential_path}")
-                        if potential_path.exists():
-                            logger.info(f"🔽 File found in user folder, sending: {filename}")
-                            return send_file(
-                                potential_path,
-                                as_attachment=True,
-                                download_name=filename
-                            )
+#                     # CRITICAL: Ensure the resolved path is still within user's folder
+#                     if str(potential_path).startswith(str(user_folder.resolve())):
+#                         logger.info(f"🔽 Checking: {potential_path}")
+#                         if potential_path.exists():
+#                             logger.info(f"🔽 File found in user folder, sending: {filename}")
+#                             return send_file(
+#                                 potential_path,
+#                                 as_attachment=True,
+#                                 download_name=filename
+#                             )
                 
-                logger.error(f"🔽 File not found: {filename}")
-                return jsonify({"error": "File not found on disk"}), 404
-        else:
-            logger.error(f"🔽 File path not available for file {file_id}")
-            return jsonify({"error": "File path not available"}), 404
+#                 logger.error(f"🔽 File not found: {filename}")
+#                 return jsonify({"error": "File not found on disk"}), 404
+#         else:
+#             logger.error(f"🔽 File path not available for file {file_id}")
+#             return jsonify({"error": "File path not available"}), 404
             
-    except Exception as e:
-        logger.error(f"Error downloading file {file_id}: {e}")
-        return jsonify({"error": str(e)}), 500
+#     except Exception as e:
+#         logger.error(f"Error downloading file {file_id}: {e}")
+#         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/files/<int:file_id>/preview', methods=['GET'])
 @login_required
@@ -1044,177 +1045,7 @@ def move_file_to_folder(file_id):
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-# ============ ADMIN API ROUTES ============
 
-@app.route('/api/admin/stats', methods=['GET'])
-@login_required
-@admin_required
-def admin_get_stats():
-    """API lấy thống kê tổng quan cho admin"""
-    try:
-        # Lấy tất cả users
-        users = auth_db.get_all_users()
-        
-        # Lấy tất cả files
-        all_files = db.get_all_files()
-        
-        # Tính toán stats
-        total_users = len(users)
-        total_files = len(all_files)
-        total_size = sum(f.get('size', 0) or 0 for f in all_files if f.get('status') == 'completed')
-        
-        # Files upload hôm nay
-        from datetime import datetime, date
-        today = date.today().isoformat()
-        today_uploads = len([f for f in all_files if f.get('created_at', '').startswith(today)])
-        
-        return jsonify({
-            'total_users': total_users,
-            'total_files': total_files,
-            'total_size': total_size,
-            'today_uploads': today_uploads,
-            'active_users': len([u for u in users if u.get('last_login')]),
-            'completed_files': len([f for f in all_files if f.get('status') == 'completed'])
-        })
-    except Exception as e:
-        logger.error(f"Error getting admin stats: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/users', methods=['GET'])
-@login_required
-@admin_required
-def admin_get_users():
-    """API lấy danh sách tất cả users cho admin"""
-    try:
-        users = auth_db.get_all_users()
-        return jsonify(users)
-    except Exception as e:
-        logger.error(f"Error getting users: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/users', methods=['POST'])
-@login_required
-@admin_required
-def admin_create_user():
-    """API tạo user mới cho admin"""
-    try:
-        data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
-        role = data.get('role', 'user')
-        
-        if not username or not password:
-            return jsonify({'error': 'Username and password required'}), 400
-        
-        if role not in ['user', 'admin']:
-            return jsonify({'error': 'Invalid role'}), 400
-        
-        user_id = auth_db.create_user(username, password, role)
-        if user_id:
-            return jsonify({
-                'success': True,
-                'user_id': user_id,
-                'message': 'User created successfully'
-            })
-        else:
-            return jsonify({'error': 'Username already exists'}), 409
-    except Exception as e:
-        logger.error(f"Error creating user: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
-@login_required
-@admin_required
-def admin_delete_user(user_id):
-    """API xóa user cho admin"""
-    try:
-        current_user = get_current_user()
-        if current_user['id'] == user_id:
-            return jsonify({'error': 'Cannot delete yourself'}), 400
-        
-        success = auth_db.delete_user(user_id)
-        if success:
-            return jsonify({'success': True, 'message': 'User deleted successfully'})
-        else:
-            return jsonify({'error': 'User not found'}), 404
-    except Exception as e:
-        logger.error(f"Error deleting user: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/users/<int:user_id>/reset-password', methods=['POST'])
-@login_required
-@admin_required
-def admin_reset_password(user_id):
-    """API reset password cho admin"""
-    try:
-        data = request.get_json()
-        new_password = data.get('password')
-        
-        if not new_password:
-            return jsonify({'error': 'New password required'}), 400
-        
-        success = auth_db.reset_password(user_id, new_password)
-        if success:
-            return jsonify({'success': True, 'message': 'Password reset successfully'})
-        else:
-            return jsonify({'error': 'User not found'}), 404
-    except Exception as e:
-        logger.error(f"Error resetting password: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/files', methods=['GET'])
-@login_required
-@admin_required
-def admin_get_files():
-    """API lấy danh sách tất cả files cho admin"""
-    try:
-        all_files = db.get_all_files()
-        
-        # Lấy thông tin user cho mỗi file
-        users = {user['id']: user for user in auth_db.get_all_users()}
-        
-        # Thêm username vào file info
-        for file in all_files:
-            user_id = file.get('user_id')
-            if user_id and user_id in users:
-                file['username'] = users[user_id]['username']
-            else:
-                file['username'] = 'Unknown'
-        
-        return jsonify(all_files)
-    except Exception as e:
-        logger.error(f"Error getting admin files: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/files/<int:file_id>', methods=['DELETE'])
-@login_required
-@admin_required
-def admin_delete_file(file_id):
-    """API xóa file cho admin - di chuyển vào recycle bin"""
-    try:
-        current_user = get_current_user()
-        if not current_user:
-            logger.error("❌ Current user not found in admin_delete_file")
-            return jsonify({'error': 'User not found'}), 401
-        
-        logger.info(f"🗑️ ADMIN DELETE FILE - User: {current_user['username']} (ID: {current_user['id']}) deleting file ID: {file_id}")
-        
-        # Di chuyển file vào recycle bin thay vì xóa ngay
-        success = db.move_to_recycle_bin(file_id, current_user['id'], days_to_keep=30)
-        if success:
-            logger.info(f"✅ File {file_id} moved to recycle bin successfully by admin {current_user['username']}")
-            return jsonify({'success': True, 'message': 'File moved to recycle bin successfully'})
-        else:
-            logger.error(f"❌ Failed to move file {file_id} to recycle bin")
-            return jsonify({'error': 'Failed to move file to recycle bin'}), 500
-    except Exception as e:
-        logger.error(f"Error moving admin file to recycle bin: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/test-simple')
-def test_simple():
-    logger.info("🔥 SIMPLE TEST ENDPOINT HIT!")
-    return "TEST OK!"
 
 # ==================== RECYCLE BIN API ENDPOINTS ====================
 
@@ -1460,6 +1291,178 @@ def permanently_delete_file(recycle_id):
     except Exception as e:
         logger.error(f"Error permanently deleting file: {e}")
         return jsonify({'error': str(e)}), 500
+    
+    # ============ ADMIN API ROUTES ============
+
+@app.route('/api/admin/stats', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_stats():
+    """API lấy thống kê tổng quan cho admin"""
+    try:
+        # Lấy tất cả users
+        users = auth_db.get_all_users()
+        
+        # Lấy tất cả files
+        all_files = db.get_all_files()
+        
+        # Tính toán stats
+        total_users = len(users)
+        total_files = len(all_files)
+        total_size = sum(f.get('size', 0) or 0 for f in all_files if f.get('status') == 'completed')
+        
+        # Files upload hôm nay
+        from datetime import datetime, date
+        today = date.today().isoformat()
+        today_uploads = len([f for f in all_files if f.get('created_at', '').startswith(today)])
+        
+        return jsonify({
+            'total_users': total_users,
+            'total_files': total_files,
+            'total_size': total_size,
+            'today_uploads': today_uploads,
+            'active_users': len([u for u in users if u.get('last_login')]),
+            'completed_files': len([f for f in all_files if f.get('status') == 'completed'])
+        })
+    except Exception as e:
+        logger.error(f"Error getting admin stats: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_users():
+    """API lấy danh sách tất cả users cho admin"""
+    try:
+        users = auth_db.get_all_users()
+        return jsonify(users)
+    except Exception as e:
+        logger.error(f"Error getting users: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users', methods=['POST'])
+@login_required
+@admin_required
+def admin_create_user():
+    """API tạo user mới cho admin"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        role = data.get('role', 'user')
+        
+        if not username or not password:
+            return jsonify({'error': 'Username and password required'}), 400
+        
+        if role not in ['user', 'admin']:
+            return jsonify({'error': 'Invalid role'}), 400
+        
+        user_id = auth_db.create_user(username, password, role)
+        if user_id:
+            return jsonify({
+                'success': True,
+                'user_id': user_id,
+                'message': 'User created successfully'
+            })
+        else:
+            return jsonify({'error': 'Username already exists'}), 409
+    except Exception as e:
+        logger.error(f"Error creating user: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_user(user_id):
+    """API xóa user cho admin"""
+    try:
+        current_user = get_current_user()
+        if current_user['id'] == user_id:
+            return jsonify({'error': 'Cannot delete yourself'}), 400
+        
+        success = auth_db.delete_user(user_id)
+        if success:
+            return jsonify({'success': True, 'message': 'User deleted successfully'})
+        else:
+            return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        logger.error(f"Error deleting user: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+@admin_required
+def admin_reset_password(user_id):
+    """API reset password cho admin"""
+    try:
+        data = request.get_json()
+        new_password = data.get('password')
+        
+        if not new_password:
+            return jsonify({'error': 'New password required'}), 400
+        
+        success = auth_db.reset_password(user_id, new_password)
+        if success:
+            return jsonify({'success': True, 'message': 'Password reset successfully'})
+        else:
+            return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        logger.error(f"Error resetting password: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/files', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_files():
+    """API lấy danh sách tất cả files cho admin"""
+    try:
+        all_files = db.get_all_files()
+        
+        # Lấy thông tin user cho mỗi file
+        users = {user['id']: user for user in auth_db.get_all_users()}
+        
+        # Thêm username vào file info
+        for file in all_files:
+            user_id = file.get('user_id')
+            if user_id and user_id in users:
+                file['username'] = users[user_id]['username']
+            else:
+                file['username'] = 'Unknown'
+        
+        return jsonify(all_files)
+    except Exception as e:
+        logger.error(f"Error getting admin files: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/files/<int:file_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_file(file_id):
+    """API xóa file cho admin - di chuyển vào recycle bin"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            logger.error("❌ Current user not found in admin_delete_file")
+            return jsonify({'error': 'User not found'}), 401
+        
+        logger.info(f"🗑️ ADMIN DELETE FILE - User: {current_user['username']} (ID: {current_user['id']}) deleting file ID: {file_id}")
+        
+        # Di chuyển file vào recycle bin thay vì xóa ngay
+        success = db.move_to_recycle_bin(file_id, current_user['id'], days_to_keep=30)
+        if success:
+            logger.info(f"✅ File {file_id} moved to recycle bin successfully by admin {current_user['username']}")
+            return jsonify({'success': True, 'message': 'File moved to recycle bin successfully'})
+        else:
+            logger.error(f"❌ Failed to move file {file_id} to recycle bin")
+            return jsonify({'error': 'Failed to move file to recycle bin'}), 500
+    except Exception as e:
+        logger.error(f"Error moving admin file to recycle bin: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/test-simple')
+def test_simple():
+    logger.info("🔥 SIMPLE TEST ENDPOINT HIT!")
+    return "TEST OK!"
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
