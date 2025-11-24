@@ -4,9 +4,9 @@
 **Thành viên nhóm:**
 
 - Lê Nguyễn Duy Cường
-- Lê Minh Hữu : Luân
-  **Giảng viên hướng dẫn:** Bùi Dương Thế
-  **Thời gian thực hiện:** 17/7 đến 5/9
+- Lê Minh Hữu 
+  **Giảng viên hướng dẫn:** Mai Ngọc Châu
+  **Thời gian thực hiện:** 
 
 # FlexTransfer Hub - Hệ thống Upload và Quản lý Files với Phân Quyền
 
