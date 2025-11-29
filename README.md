@@ -1,163 +1,249 @@
-# Dự án cuối kỳ môn Lập trình mạng - Nhóm 8
+<div align="center">
 
-**Trường:** Đại học Giao thông Vận tải TP Hồ Chí Minh
-**Thành viên nhóm:**
+# TransferFlow Hub
 
-- Lê Nguyễn Duy Cường
-- Lê Minh Hữu 
-  **Giảng viên hướng dẫn:** Mai Ngọc Châu
-  **Thời gian thực hiện:** 
+## Hệ thống Upload và Quản lý Files với Phân Quyền
 
-# FlexTransfer Hub - Hệ thống Upload và Quản lý Files với Phân Quyền
+[![Python](https://img.shields.io/badge/Python-3.8+-3670A0?style=for-the-badge&logo=python)](https://www.python.org)
+[![Flask](https://img.shields.io/badge/Flask-2.0+-000000?style=for-the-badge&logo=flask)](https://flask.palletsprojects.com)
+[![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite)](https://www.sqlite.org)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-Ứng dụng quản lý chuyển file chuyên nghiệp với khả năng upload files lên remote server và quản lý files thông qua giao diện web riêng biệt. **Tích hợp hệ thống phân quyền người dùng đầy đủ.**
+Ứng dụng quản lý chuyển file chuyên nghiệp với khả năng upload files lên remote server, quản lý files thông qua giao diện web riêng biệt và hệ thống phân quyền người dùng đầy đủ.
 
-## 🚀 Tính năng mới
+</div>
 
-- **🔐 Hệ thống phân quyền**: Đăng nhập/đăng ký, quản lý user và session
-- **👤 User isolation**: Mỗi user chỉ thấy files của mình
-- **🗑️ Recycle Bin**: Thùng rác với khả năng khôi phục files trong 7-30 ngày
-- **👁️ File Preview**: Preview ảnh, PDF, video, audio và text files
-- **Upload files lên remote server**: Files được gửi đến một web server khác thay vì lưu local
-- **Trang quản lý files riêng biệt**: Giao diện web chuyên dụng để quản lý files và folders
-- **Quản lý folders**: Tạo, xóa, tổ chức folders với nested support
-- **Thống kê real-time**: Hiển thị số lượng files, folders, dung lượng tổng theo user
-- **Tìm kiếm và lọc**: Tìm kiếm files theo tên, lọc theo loại
-- **Download files**: Download files từ remote server
+---
+
+## 📋 Thông tin Dự án
+
+| Thông tin      | Chi tiết                                  |
+| -------------- | ----------------------------------------- |
+| **Trường**     | Đại học Giao thông Vận tải TP Hồ Chí Minh |
+| **Môn học**    | Lập trình mạng                            |
+| **Giảng viên** | Mai Ngọc Châu                             |
+| **Tên dự án**  | TransferFlow Hub                          |
+
+### 👥 Thành viên nhóm
+
+| STT | Họ và tên           |
+| --- | ------------------- |
+| 1   | Lê Nguyễn Duy Cường |
+| 2   | Lê Minh Hữu Luân    |
+| 3   | Nguyễn Gia Quy      |
+| 4   | Nguyễn Thị Thùy Vân |
+| 5   | Võ Đặng Vũ Phong    |
+| 6   | Mã Nhật Thanh       |
+
+---
+
+## ✨ Tính năng chính
+
+| Tính năng                  | Mô tả                                                  |
+| -------------------------- | ------------------------------------------------------ |
+| 🔐 **Hệ thống phân quyền** | Đăng nhập/đăng ký với quản lý quyền hạn (Admin/User)   |
+| 👤 **User Isolation**      | Mỗi user chỉ thấy và truy cập files của chính mình     |
+| 🗑️ **Thùng rác**           | Khôi phục files trong 7-30 ngày (tùy thuộc role)       |
+| 👁️ **File Preview**        | Xem trước ảnh, PDF, video, audio và text files         |
+| ☁️ **Remote Upload**       | Upload files lên remote server thay vì lưu local       |
+| 📁 **Quản lý Folders**     | Tạo, xóa, tổ chức folders với nested support           |
+| 📊 **Thống kê Real-time**  | Dashboard hiển thị files, folders, dung lượng của user |
+| 🔍 **Tìm kiếm & Lọc**      | Tìm files theo tên, lọc theo loại file                 |
+| ⬇️ **Download Files**      | Tải files từ remote server                             |
+| 🔒 **Session Management**  | Xác thực an toàn với token expiration                  |
+
+---
 
 ## 🏗️ Kiến trúc hệ thống
 
 ```
-┌─────────────────┐    WebSocket    ┌─────────────────┐    HTTP POST    ┌─────────────────┐
-│   Frontend      │ ──────────────► │  WebSocket      │ ──────────────► │  File Manager   │
-│   (Upload UI)   │                 │  Server         │                 │  Server         │
-└─────────────────┘                 └─────────────────┘                 └─────────────────┘
-                                              │                                │
-                                              │                      ┌─────────┴─────────┐
-                                              ▼                      │                   │
-                                    ┌─────────────────┐              ▼                   ▼
-                                    │  Temp Storage   │    ┌─────────────────┐  ┌─────────────────┐
-                                    │  (Local)        │    │  Auth Database  │  │  File Database  │
-                                    └─────────────────┘    │  (SQLite)       │  │  (SQLite)       │
-                                                           └─────────────────┘  └─────────────────┘
+┌─────────────────┐    WebSocket    ┌─────────────────┐    HTTP POST    ┌──────────────────┐
+│   Frontend      │ ──────────────► │  WebSocket      │ ──────────────► │  File Manager    │
+│   (Upload UI)   │                 │  Server         │                 │  Server (Flask)  │
+│  http:8000      │                 │  ws://8765      │                 │  http://5000     │
+└─────────────────┘                 └─────────────────┘                 └──────────────────┘
+                                              │                              │
+                                              │                 ┌────────────┴────────────┐
+                                              ▼                 │                         │
+                                    ┌─────────────────┐         ▼                         ▼
+                                    │  Temp Storage   │   ┌──────────────┐          ┌──────────────┐
+                                    │  (Local Cache)  │   │    Auth DB   │          │   Files DB   │
+                                    │  temp_uploads/  │   │   (SQLite)   │          │  (SQLite)    │
+                                    └─────────────────┘   │ auth.db      │          │  files.db    │
+                                                          └──────────────┘          └──────────────┘
+                                                                │
+                                                                ▼
+                                                    ┌──────────────────────┐
+                                                    │  Remote Storage      │
+                                                    │  remote_uploads/     │
+                                                    │  └── {username}/     │
+                                                    └──────────────────────┘
 ```
 
-## 🔐 Database Schema
+### 📡 Luồng xử lý
 
-### Bảng users
+1. **Frontend** → Upload files qua kéo thả
+2. **WebSocket** → Gửi files đến server
+3. **Temp Storage** → Lưu tạm thời
+4. **Remote Upload** → Chuyển đến File Manager
+5. **Storage** → Lưu vào thư mục user
+6. **Database** → Ghi metadata
+7. **Management** → User quản lý qua web UI
+
+---
+
+## 🔐 Cơ sở dữ liệu
+
+### 📊 Lược đồ Database
+
+#### Bảng `users` - Quản lý người dùng
 
 ```sql
-users(
-  id INTEGER PRIMARY KEY,
-  username TEXT UNIQUE,
-  password_hash TEXT,
-  role TEXT,
-  created_at TIMESTAMP,
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT DEFAULT 'user',  -- 'admin' hoặc 'user'
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_login TIMESTAMP
-)
+);
 ```
 
-### Bảng files
+#### Bảng `files` - Lưu trữ metadata file
 
 ```sql
-files(
-  id INTEGER PRIMARY KEY,
-  filename TEXT,
-  original_filename TEXT,
-  size INTEGER,
-  user_id INTEGER,
+CREATE TABLE files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  filename TEXT NOT NULL,
+  original_filename TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
   folder_id TEXT,
-  file_path TEXT,
-  created_at TIMESTAMP,
+  file_path TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id)
-)
+);
 ```
 
-### Bảng folders
+#### Bảng `folders` - Quản lý thư mục
 
 ```sql
-folders(
+CREATE TABLE folders (
   id TEXT PRIMARY KEY,
-  name TEXT,
-  path TEXT,
+  name TEXT NOT NULL,
+  path TEXT NOT NULL,
   parent_id TEXT,
-  user_id INTEGER,
-  created_at TIMESTAMP,
+  user_id INTEGER NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id)
-)
+);
 ```
 
-### Bảng recycle_bin
+#### Bảng `recycle_bin` - Thùng rác
 
 ```sql
-recycle_bin(
-  id INTEGER PRIMARY KEY,
+CREATE TABLE recycle_bin (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   original_file_id INTEGER,
-  filename TEXT,
-  original_filename TEXT,
-  size INTEGER,
-  user_id INTEGER,
-  file_path TEXT,
+  filename TEXT NOT NULL,
+  original_filename TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  file_path TEXT NOT NULL,
   deleted_by INTEGER,
-  deleted_at TIMESTAMP,
+  deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   restore_deadline TIMESTAMP,
-  status TEXT,
+  status TEXT DEFAULT 'deleted',
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (deleted_by) REFERENCES users(id)
-)
+);
 ```
 
-### Bảng sessions
+#### Bảng `sessions` - Quản lý phiên đăng nhập
 
 ```sql
-sessions(
+CREATE TABLE sessions (
   id TEXT PRIMARY KEY,
-  user_id INTEGER,
-  token TEXT UNIQUE,
-  expires_at TIMESTAMP,
+  user_id INTEGER NOT NULL,
+  token TEXT UNIQUE NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id)
-)
+);
 ```
 
-## 📁 Cấu trúc thư mục
+---
+
+## 📁 Cấu trúc Dự án
 
 ```
-backend/
-├── server.py              # WebSocket server (nhận files)
-├── file_manager.py        # Flask server (quản lý files + authentication)
-├── auth_database.py       # Authentication database helper
-├── database.py            # File database helper
-├── migrate_database.py    # Database migration script
-├── templates/
-│   ├── index.html         # Giao diện quản lý files (cần đăng nhập)
-│   ├── login.html         # Trang đăng nhập
-│   └── register.html      # Trang đăng ký
-├── temp_uploads/          # Thư mục tạm lưu files
+Nhom8_LapTrinhUngDungDownloadUploadMultiFile/
+│
+├── backend/                           # Backend services
+│   ├── server.py                      # WebSocket server (port 8765)
+│   ├── file_manager.py                # Flask web server (port 5000)
+│   ├── auth_database.py               # Authentication helper
+│   ├── database.py                    # File database helper
+│   ├── migrate_database.py            # Database migration script
+│   ├── create_admin.py                # Tạo admin account
+│   ├── client.py                      # Test client
+│   ├── logger.py                      # Logging utility
+│   │
+│   ├── templates/                     # HTML templates
+│   │   ├── index.html                 # File manager UI
+│   │   ├── login.html                 # Login page
+│   │   ├── register.html              # Register page
+│   │   └── admin.html                 # Admin panel
+│   │
+│   ├── temp_uploads/                  # Temporary file storage
+│   ├── remote_uploads/                # Final storage
+│   │   ├── admin/
+│   │   ├── duy11ff/
+│   │   ├── duycuong12/
+│   │   └── luan11/
+│   │
+│   ├── auth.db                        # Authentication database (SQLite)
+│   ├── files.db                       # File metadata database (SQLite)
+│   ├── requirements.txt               # Python dependencies
+│   ├── README.md                      # Backend documentation
+│   └── logging.md                     # Logging configuration
+│
+├── frontend/                          # Frontend application
+│   ├── index.html                     # Upload UI
+│   ├── script.js                      # Upload logic
+│   └── style.css                      # Styles
+│
+├── README.md                          # This file
+├── start_all.bat                      # Batch script to start all servers
+├── check_ports.bat                    # Check port availability
+└── .env                               # Environment variables (optional)
 ```
 
-backend/remote_uploads/ # Thư mục lưu files cuối cùng
-│ └── {username}/ # Folders riêng cho từng user (theo username)
-├── auth.db # Database lưu users và sessions
-├── files.db # Database lưu metadata files
-└── requirements.txt # Dependencies
+---
 
-frontend/
-├── index.html # Giao diện upload files
-├── script.js # Logic upload
-└── style.css # Styles
+## 🚀 Cài đặt và Chạy
 
-````
+### ⚙️ Yêu cầu hệ thống
 
-## 🛠️ Cài đặt và chạy
+- **Python**: 3.8 hoặc cao hơn
+- **pip**: Package manager cho Python
+- **Trình duyệt web**: Chrome, Firefox, Edge, Safari
 
-### 1. Cài đặt dependencies
+### 📦 Bước 1: Cài đặt Dependencies
 
 ```bash
 cd backend
 pip install -r requirements.txt
-````
+```
 
-### 2. Khởi tạo database và tạo admin user
+Các package sẽ được cài đặt:
+
+- Flask (web framework)
+- websockets (WebSocket support)
+- sqlite3 (database)
+- Werkzeug (utilities)
+
+### 🗄️ Bước 2: Khởi tạo Database
 
 ```bash
 cd backend
@@ -165,206 +251,665 @@ python auth_database.py
 python migrate_database.py
 ```
 
-**Default accounts được tạo:**
+**Default Accounts được tạo:**
 
-- **admin** / **admin123** (role: admin)
-- **testuser** / **test123** (role: user)
+| Username | Password | Role  | Mô tả                                    |
+| -------- | -------- | ----- | ---------------------------------------- |
+| admin    | admin123 | admin | Quản trị viên - 30 ngày lưu thùng rác    |
+| testuser | test123  | user  | Người dùng thường - 7 ngày lưu thùng rác |
 
-### 3. Chạy File Manager Server (với authentication)
+### ⚡ Bước 3: Chạy File Manager Server
 
 ```bash
 cd backend
 python file_manager.py
 ```
 
-Server sẽ chạy trên `http://localhost:5000`
+✅ Server chạy trên: **http://localhost:5000**
 
-### 4. Chạy WebSocket Server (nhận files)
+### 🔌 Bước 4: Chạy WebSocket Server
+
+Mở terminal mới và chạy:
 
 ```bash
 cd backend
 python server.py
 ```
 
-Server sẽ chạy trên `ws://localhost:8765`
+✅ Server chạy trên: **ws://localhost:8765**
 
-### 5. Chạy Frontend (giao diện upload)
+### 🌐 Bước 5: Chạy Frontend (Upload UI)
+
+Mở terminal khác và chạy:
 
 ```bash
 cd frontend
 python -m http.server 8000
 ```
 
-Truy cập `http://localhost:8000` để upload files
+✅ Frontend chạy trên: **http://localhost:8000**
 
-### Lưu ý khi khởi động dự án mới
+### 💡 Quick Start - Chạy tất cả cùng lúc
 
-Nếu bạn vừa copy code sang thư mục mới và chưa có file `auth.db` hoặc chưa có tài khoản admin, hãy chạy script sau để tạo tài khoản admin mặc định:
+**Windows:**
+
+```bash
+start_all.bat
+```
+
+**Linux/Mac:**
+
+```bash
+./start_all.sh
+```
+
+### 🆕 Lưu ý khi khởi động dự án mới
+
+Nếu bạn vừa copy code mới và **chưa có file `auth.db`**:
 
 ```bash
 cd backend
 python create_admin.py
 ```
 
-Sau khi chạy xong, bạn có thể đăng nhập vào admin panel bằng tài khoản:
+Sau đó đăng nhập bằng:
 
-- **admin** / **admin123**
+- **Username**: admin
+- **Password**: admin123
 
-Không cần copy file database cũ, chỉ cần chạy script này là có thể sử dụng quyền admin để quản lý hệ thống.
+---
 
-## 🔧 Cấu hình
+## ⚙️ Cấu hình
 
-### Environment Variables
+### 🔑 Environment Variables
 
-Tạo file `.env` trong thư mục `backend`:
+Tạo file `.env` trong thư mục `backend` (tùy chọn):
 
 ```env
+# Server Configuration
 REMOTE_UPLOAD_URL=http://localhost:5000/api/upload
 REMOTE_SERVER_TOKEN=your-secret-token
+
+# WebSocket Configuration
 WS_HOST=localhost
 WS_PORT=8765
+
+# Flask Configuration
+FLASK_ENV=development
+FLASK_DEBUG=True
+
+# File Upload
+MAX_CONTENT_LENGTH=536870912  # 512MB
+UPLOAD_FOLDER=remote_uploads
 ```
 
-### Thay đổi cấu hình
+### 📝 Tham số Cấu hình
 
-- **REMOTE_UPLOAD_URL**: URL của server quản lý files
-- **REMOTE_SERVER_TOKEN**: Token xác thực (có thể bỏ qua nếu chạy local)
-- **WS_HOST/WS_PORT**: Host và port của WebSocket server
+| Tham số               | Mô tả                            | Mặc định                         |
+| --------------------- | -------------------------------- | -------------------------------- |
+| `REMOTE_UPLOAD_URL`   | URL server quản lý files         | http://localhost:5000/api/upload |
+| `REMOTE_SERVER_TOKEN` | Token xác thực (local có thể bỏ) | -                                |
+| `WS_HOST`             | Host của WebSocket server        | localhost                        |
+| `WS_PORT`             | Port của WebSocket server        | 8765                             |
+| `MAX_CONTENT_LENGTH`  | Kích thước file tối đa (bytes)   | 512MB                            |
+| `UPLOAD_FOLDER`       | Thư mục lưu files                | remote_uploads                   |
 
-## 📱 Sử dụng
+---
 
-### 1. Đăng nhập vào hệ thống
+## 📖 Hướng dẫn Sử dụng
 
-1. Mở `http://localhost:5000`
-2. Đăng nhập bằng tài khoản:
-   - **admin** / **admin123** (quản trị viên)
-   - **testuser** / **test123** (người dùng)
-   - Hoặc đăng ký tài khoản mới
+### 1️⃣ Đăng nhập / Đăng ký
 
-### 2. Upload Files
+1. Mở trình duyệt và truy cập: **http://localhost:5000**
+2. Chọn:
+   - **Đăng nhập**: Sử dụng tài khoản mặc định hoặc tài khoản của bạn
+   - **Đăng ký**: Tạo tài khoản mới
 
-1. Sau khi đăng nhập, click "Upload Files" để mở `http://localhost:8000`
-2. Kéo thả files hoặc click "browse files"
-3. Files sẽ được upload qua WebSocket và gửi đến File Manager Server
-4. **Files sẽ được lưu với username của bạn và chỉ bạn mới thấy được**
+**Tài khoản mặc định:**
 
-### 3. Quản lý Files
+```
+Admin:     admin / admin123
+TestUser:  testuser / test123
+```
 
-1. Quay lại `http://localhost:5000` (file manager)
-2. Xem danh sách files **chỉ thuộc về tài khoản của bạn**
-3. Tạo folders mới (nested folders support)
-4. Download hoặc xóa files
-5. Tìm kiếm files theo tên
-6. Move files giữa các folders
+### 2️⃣ Upload Files
 
-### 4. Thống kê User
+1. Đăng nhập thành công → Giao diện File Manager
+2. Click nút **"📤 Upload Files"** → Chuyển đến http://localhost:8000
+3. **Cách upload**:
+   - ✅ **Kéo thả files** vào vùng upload
+   - ✅ **Click nút "Browse Files"** để chọn từ máy tính
+4. Chờ upload hoàn tất (các files được lưu vào thư mục của user)
+5. **Trở về File Manager** để xem files vừa upload
 
-- Tổng số files và folders **của user hiện tại**
-- Dung lượng tổng **của user hiện tại**
-- Số loại files khác nhau **của user hiện tại**
+### 3️⃣ Quản lý Files
 
-### 6. Thùng rác (Recycle Bin)
+| Thao tác          | Mô tả                                      |
+| ----------------- | ------------------------------------------ |
+| 📂 **Tạo Folder** | Click "Tạo folder mới" → Nhập tên → OK     |
+| 🔍 **Tìm kiếm**   | Nhập tên file → Tìm kiếm tức thời          |
+| 🔀 **Move File**  | Chọn file → Kéo vào folder hoặc menu move  |
+| ⬇️ **Download**   | Click "⬇️ Download" bên cạnh file          |
+| 👁️ **Preview**    | Click "👁️ Preview" để xem trước file       |
+| 🗑️ **Xóa**        | Click "🗑️ Xóa" → File chuyển vào thùng rác |
 
-- Click nút "🗑️ Thùng rác" để xem files đã xóa
-- **Xóa file**: Files bị "xóa" sẽ chuyển vào thùng rác, không bị xóa vĩnh viễn
-- **Thời gian lưu giữ**:
-  - User files: 7 ngày
-  - Admin files: 30 ngày
-- **Khôi phục**: Click "♻️ Khôi phục" để đưa file về trạng thái bình thường
-- **Xóa vĩnh viễn**: Click "💀 Xóa vĩnh viễn" để xóa hoàn toàn (không thể khôi phục)
+### 4️⃣ Xem thống kê
 
-### 7. Preview Files
+Dashboard hiển thị thông tin của **user hiện tại**:
 
-- Click nút "👁️ Preview" bên cạnh file để xem trước
-- **Hỗ trợ**: Ảnh, PDF, Video, Audio, Text files
-- **Fallback**: Files không hỗ trợ sẽ hiện nút download
+- 📊 **Tổng files**: Số lượng files
+- 📁 **Tổng folders**: Số lượng thư mục
+- 💾 **Dung lượng sử dụng**: GB/MB
+- 🏷️ **Loại files**: Số lượng kiểu file khác nhau
 
-### 8. Đăng xuất
+### 5️⃣ Thùng Rác (Recycle Bin)
 
-- Click "Đăng xuất" ở góc phải màn hình
-- Session sẽ được xóa và redirect về trang login
+```
+📌 Tính năng:
+├── 🗑️ Xem tất cả files đã xóa
+├── ♻️ Khôi phục files về bình thường
+├── 💀 Xóa vĩnh viễn (không thể khôi phục)
+└── ⏰ Thời hạn khôi phục
+    ├── User: 7 ngày
+    └── Admin: 30 ngày
+```
+
+**Sử dụng:**
+
+1. Click nút "🗑️ Thùng rác" ở menu
+2. Xem danh sách files đã xóa
+3. Chọn tác vụ:
+   - **♻️ Khôi phục**: Đưa file về thư mục gốc
+   - **💀 Xóa vĩnh viễn**: Xóa hoàn toàn khỏi hệ thống
+
+### 6️⃣ File Preview
+
+**Hỗ trợ các loại file:**
+
+| Loại         | Format                        |
+| ------------ | ----------------------------- |
+| 🖼️ **Ảnh**   | JPG, PNG, GIF, WebP, BMP      |
+| 📄 **PDF**   | PDF (xem qua viewer)          |
+| 🎬 **Video** | MP4, WebM, OGG                |
+| 🔊 **Audio** | MP3, WAV, OGG                 |
+| 📝 **Text**  | TXT, JSON, XML, HTML, CSS, JS |
+
+**Cách sử dụng:**
+
+1. Click "👁️ Preview" bên cạnh file
+2. File sẽ hiển thị trong modal popup
+3. Có thể zoom, phát, hoặc download
+
+### 7️⃣ Đăng xuất
+
+1. Click **"👤 Đăng xuất"** ở góc trên phải
+2. Session được xóa → Chuyển về trang login
+3. Toàn bộ files vẫn được bảo lưu
+
+---
 
 ## 🔒 Bảo mật
 
-- **🔐 Session-based Authentication**: Sử dụng secure session tokens với expiration
-- **🔑 Password Hashing**: PBKDF2 với salt cho bảo mật cao
-- **👤 User Isolation**: Mỗi user chỉ thấy và truy cập files của mình
-- **🗂️ File Segregation**: Files được lưu trong folders riêng biệt theo username
-- **⏰ Session Management**: Auto logout khi token hết hạn
-- **🛡️ Authorization Middleware**: Kiểm tra quyền truy cập cho mọi API call
-- **📁 Secure Filenames**: Sử dụng `secure_filename` để tránh path traversal
-- **🔍 Input Validation**: Kiểm tra tên file và kích thước
+### Các biện pháp bảo mật được áp dụng:
 
-## 🚨 Troubleshooting
+| Biện pháp                     | Mô tả                               | Lợi ích                               |
+| ----------------------------- | ----------------------------------- | ------------------------------------- |
+| 🔐 **Session Authentication** | Sử dụng secure token với expiration | Tránh unauthorized access             |
+| 🔑 **Password Hashing**       | PBKDF2 + salt cho mỗi user          | Nếu db bị leak, passwords vẫn an toàn |
+| 👤 **User Isolation**         | User chỉ thấy files của chính họ    | Dữ liệu hoàn toàn riêng tư            |
+| 📁 **File Segregation**       | Files lưu riêng theo username       | Phân tách hoàn toàn giữa users        |
+| ⏰ **Auto Logout**            | Token expire → tự động logout       | Tránh session hijacking               |
+| ✅ **Authorization Check**    | Kiểm tra quyền trên mọi API         | Chặn unauthorized requests            |
+| 🛡️ **Secure Filenames**       | Sử dụng `secure_filename`           | Tránh path traversal attacks          |
+| 🔍 **Input Validation**       | Kiểm tra tên file, kích thước       | Xác thực dữ liệu input                |
 
-### Lỗi thường gặp
+### 🔄 Session & Token
 
-1. **Không thể đăng nhập**
+```
+Login → Tạo token → Lưu vào cookie → Gửi theo request
+        ↓
+      Kiểm tra token trong middleware
+        ↓
+      Token valid? → YES → Allow request
+                   → NO  → Redirect to login
+        ↓
+Token expire → Auto logout
+```
 
-   - Kiểm tra username/password
-   - Kiểm tra database auth.db có tồn tại không
-   - Chạy `python auth_database.py` để tạo lại admin user
+### 👮 Role-based Access Control (RBAC)
 
-2. **Database errors**
+```
+ADMIN Role:
+├── Quản lý tất cả users
+├── Xem admin panel
+├── Thùng rác 30 ngày
+└── Full access
 
-   - Chạy `python migrate_database.py` để cập nhật schema
-   - Xóa files.db và auth.db để reset database
+USER Role:
+├── Quản lý files của chính mình
+├── Thùng rác 7 ngày
+└── Limited access
+```
 
-3. **Files không hiển thị**
+---
 
-   - Kiểm tra đã đăng nhập chưa
-   - Files chỉ hiển thị cho đúng user đã upload
+## 🔧 Troubleshooting
 
-4. **Upload không work**
-   - Kiểm tra WebSocket server có chạy không
-   - Kiểm tra authentication token
-   - Kiểm tra user có quyền upload không
+### ❌ Lỗi thường gặp và cách khắc phục
 
-### Logs
+#### 1. Lỗi: Không thể đăng nhập
 
-- WebSocket server: Logs hiển thị trong terminal
-- File Manager: Logs hiển thị trong terminal (Flask debug mode)
+```
+Triệu chứng: "Invalid username/password" hoặc Access denied
+```
 
-## 🔄 Workflow
+**Giải pháp:**
 
-1. **Upload**: User upload file qua frontend
-2. **WebSocket**: File được gửi qua WebSocket đến server
-3. **Temp Storage**: File được lưu tạm thời
-4. **Remote Upload**: File được gửi đến File Manager Server
-5. **Storage**: File được lưu vào thư mục cuối cùng
-6. **Database**: Thông tin file được lưu vào database
-7. **Management**: User có thể quản lý file qua giao diện web
+```bash
+# Kiểm tra database
+cd backend
+ls -la auth.db  # Hoặc dir auth.db trên Windows
 
-## 📈 Mở rộng
+# Tạo lại database
+python auth_database.py
+python create_admin.py
+```
 
-### Thêm tính năng
+**Nguyên nhân phổ biến:**
 
-- **User Authentication**: Đăng nhập/đăng ký
-- **File Sharing**: Chia sẻ files với người khác
-- **Version Control**: Quản lý phiên bản files
-- **Cloud Storage**: Tích hợp với AWS S3, Google Drive
-- **API Rate Limiting**: Giới hạn số lượng upload
-- **File Compression**: Nén files trước khi upload
+- Database bị corrupted
+- Admin user chưa được tạo
+- Sai username/password
 
-### Tối ưu hóa
+#### 2. Lỗi: "Connection refused" - Port đã sử dụng
 
-- **CDN**: Sử dụng CDN để phân phối files
-- **Caching**: Cache metadata và thumbnails
-- **Load Balancing**: Cân bằng tải giữa nhiều server
-- **Database**: Sử dụng PostgreSQL/MySQL thay vì JSON file
+```
+Triệu chứng: Address already in use on port 5000/8765
+```
 
-## 📄 License
+**Giải pháp:**
 
-MIT License - Tự do sử dụng và chỉnh sửa.
+```bash
+# Kiểm tra ports
+netstat -ano | findstr "5000\|8765"  # Windows
+lsof -i :5000,8765                   # Linux/Mac
 
-## 🤝 Contributing
+# Sử dụng port khác
+# Chỉnh sửa file config hoặc environment
+```
 
-1. Fork repository
-2. Tạo feature branch
-3. Commit changes
-4. Push to branch
-5. Tạo Pull Request
+#### 3. Lỗi: Database Schema Error
 
-## 📞 Support
+```
+Triệu chứng: Table not found, Column not found
+```
 
-Nếu gặp vấn đề, vui lòng tạo issue trên GitHub hoặc liên hệ team phát triển.
+**Giải pháp:**
+
+```bash
+cd backend
+
+# Xóa database cũ
+rm auth.db files.db  # Linux/Mac
+del auth.db files.db # Windows
+
+# Tạo lại
+python auth_database.py
+python migrate_database.py
+```
+
+#### 4. Lỗi: Files không hiển thị sau upload
+
+```
+Triệu chứng: Upload thành công nhưng file không có trong danh sách
+```
+
+**Kiểm tra danh sách:**
+
+- ✅ Đã đăng nhập đúng user chưa?
+- ✅ WebSocket server có chạy không?
+- ✅ File Manager server có chạy không?
+- ✅ Check thư mục `remote_uploads/{username}/`
+
+#### 5. Lỗi: WebSocket Connection Failed
+
+```
+Triệu chứng: "Cannot connect to WebSocket server" hoặc upload failed
+```
+
+**Giải pháp:**
+
+```bash
+# Kiểm tra WebSocket server đang chạy
+# Terminal 1: Chạy file manager
+cd backend && python file_manager.py
+
+# Terminal 2: Chạy WebSocket server
+cd backend && python server.py
+
+# Terminal 3: Chạy frontend
+cd frontend && python -m http.server 8000
+```
+
+### 📋 Xem Logs
+
+**WebSocket Server Logs:**
+
+```
+Terminal sẽ hiển thị tất cả upload events:
+[2025-11-29 10:15:30] Client connected: ws://localhost:8765
+[2025-11-29 10:15:35] File received: document.pdf (2.5MB)
+```
+
+**File Manager Server Logs:**
+
+```
+Terminal sẽ hiển thị tất cả API calls:
+127.0.0.1 - - [29/Nov/2025 10:15:30] "POST /api/upload HTTP/1.1" 200
+127.0.0.1 - - [29/Nov/2025 10:15:31] "GET /api/files HTTP/1.1" 200
+```
+
+**Frontend Console Logs:**
+
+```
+F12 → Console tab
+[INFO] Upload started: 1 file(s)
+[INFO] Connected to WebSocket
+[SUCCESS] Upload completed!
+```
+
+### 🐛 Debug Mode
+
+Để bật chi tiết logging:
+
+```bash
+# Thêm vào backend/server.py hoặc file_manager.py
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
+
+### 📞 Khi cần support
+
+Cung cấp thông tin sau:
+
+1. **OS**: Windows / Linux / Mac
+2. **Python version**: `python --version`
+3. **Error message**: Copy error từ terminal
+4. **Steps to reproduce**: Cách bạn tái tạo lỗi
+5. **Screenshots**: Nếu cần
+
+---
+
+## 🔄 Workflow - Luồng xử lý Upload
+
+```
+┌─────────────────┐
+│   User Login    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ File Manager UI │ (http://localhost:5000)
+│  - View Files   │
+│  - Create Dir   │
+│  - Manage Files │
+└────────┬────────┘
+         │
+         │ Click "Upload Files"
+         ▼
+┌──────────────────┐
+│  Upload UI       │ (http://localhost:8000)
+│  - Drag & Drop   │
+│  - Browse Files  │
+└────────┬─────────┘
+         │
+         │ Select files
+         ▼
+┌──────────────────┐
+│ WebSocket Client │
+│ - Connect        │ (ws://localhost:8765)
+│ - Send File      │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ WebSocket Server │
+│ - Receive Data   │
+│ - Validate       │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ Temp Storage     │
+│ temp_uploads/    │
+│ - Buffer Files   │
+└────────┬─────────┘
+         │
+         │ Send to File Manager
+         ▼
+┌──────────────────┐
+│ File Manager API │
+│ /api/upload      │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ Final Storage    │
+│ remote_uploads/  │
+│ └── {username}/  │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ Database Update  │
+│ - Store Metadata │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ File Manager UI  │
+│ - Show in List   │
+└──────────────────┘
+```
+
+---
+
+## 📈 Roadmap & Mở rộng
+
+### 🎯 Tính năng có thể thêm
+
+```yaml
+Phase 1 (Current):
+  - ✅ User authentication & authorization
+  - ✅ File upload/download/delete
+  - ✅ Folder management
+  - ✅ Recycle bin
+  - ✅ File preview
+
+Phase 2 (Future):
+  - 🔄 File sharing & collaboration
+  - 🔄 Version control
+  - 🔄 Activity logging
+  - 🔄 User management (Admin panel)
+  - 🔄 File encryption
+
+Phase 3 (Advanced):
+  - 🔄 Cloud storage integration (AWS S3, Google Drive)
+  - 🔄 API Rate limiting
+  - 🔄 File compression
+  - 🔄 Full-text search
+  - 🔄 File versioning
+```
+
+### ⚡ Tối ưu hóa hiệu năng
+
+| Tối ưu          | Hiện tại             | Tương lai                     |
+| --------------- | -------------------- | ----------------------------- |
+| 🗄️ Database     | SQLite (Single file) | PostgreSQL/MySQL (Multi-user) |
+| 📦 Storage      | Local filesystem     | AWS S3 / Cloud Storage        |
+| 🔄 Caching      | None                 | Redis cache layer             |
+| 🌐 Distribution | Single server        | CDN + Load balancing          |
+| 🗜️ Files        | Full size            | Compression + thumbnails      |
+| 📊 Monitoring   | Basic logs           | ELK stack / Prometheus        |
+
+---
+
+## 📚 Các công nghệ sử dụng
+
+### Backend
+
+- **Framework**: Flask 2.0+ (Python web framework)
+- **Real-time**: WebSockets (Python websockets library)
+- **Database**: SQLite 3 (lightweight SQL database)
+- **Authentication**: Session tokens + Password hashing (PBKDF2)
+
+### Frontend
+
+- **HTML5**: Semantic markup
+- **CSS3**: Modern styling
+- **JavaScript (ES6+)**: Upload logic, UI interaction
+- **WebSocket API**: Real-time file transfer
+
+### DevOps
+
+- **Runtime**: Python 3.8+
+- **Package Manager**: pip
+- **Version Control**: Git
+
+---
+
+## 🤝 Đóng góp (Contributing)
+
+Nếu bạn muốn đóng góp cho dự án:
+
+1. **Fork** repository
+2. **Tạo feature branch** (`git checkout -b feature/AmazingFeature`)
+3. **Commit changes** (`git commit -m 'Add some AmazingFeature'`)
+4. **Push to branch** (`git push origin feature/AmazingFeature`)
+5. **Tạo Pull Request**
+
+### Code Style
+
+- Tuân theo PEP 8 cho Python
+- Sử dụng 4 spaces cho indentation
+- Thêm docstrings cho functions
+- Comment code phức tạp
+
+---
+
+## 📄 Giấy phép (License)
+
+```
+MIT License
+
+Copyright (c) 2025 TransferFlow Hub - Nhóm 8
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+```
+
+**Tóm tắt:**
+
+- ✅ Sử dụng cho mục đích thương mại
+- ✅ Sửa đổi code tùy ý
+- ✅ Phân phối hoặc chia sẻ
+- ❌ Không có warranty
+- ❌ Không có liability
+
+---
+
+## 📞 Support & Contact
+
+### 🆘 Khi gặp sự cố
+
+1. **Xem FAQ**: Tìm kiếm câu hỏi thường gặp ở phần Troubleshooting
+2. **Check Logs**: Xem terminal output để tìm lỗi
+3. **Reset Database**: Xóa `.db` files và tạo lại
+4. **Tạo Issue**: Báo cáo bug chi tiết trên GitHub
+
+### 📧 Liên hệ
+
+**Email:** support@transferflowhub.local
+**GitHub:** https://github.com/yourusername/repo
+
+### 📋 Template báo cáo lỗi
+
+```markdown
+## Lỗi: [Mô tả ngắn]
+
+### Thông tin hệ thống
+
+- OS: Windows 10 / Ubuntu 20.04 / etc
+- Python: 3.8 / 3.9 / 3.10 / 3.11
+- Browser: Chrome / Firefox / Edge
+
+### Các bước để tái tạo
+
+1. ...
+2. ...
+3. ...
+
+### Kết quả mong đợi
+
+...
+
+### Kết quả thực tế
+
+...
+
+### Error message / Screenshots
+
+[Paste error hoặc screenshot]
+```
+
+---
+
+## 📚 Tài liệu bổ sung
+
+- 📖 [Backend Documentation](backend/README.md)
+- 📖 [Logging Configuration](backend/logging.md)
+- 📖 [Multi-file Upload Guide](backend/MULTI_FILE_UPLOAD.MD)
+- 📖 [Database Schema](docs/database.md) _(nếu có)_
+
+---
+
+## 🙌 Lời cảm ơn
+
+- **Flask**: Web framework tuyệt vời
+- **WebSockets**: Real-time communication
+- **SQLite**: Lightweight database
+- **Community**: Mọi người đã hỗ trợ dự án
+
+---
+
+## 📊 Project Statistics
+
+```
+Total Lines of Code: ~2000+
+Languages:
+  - Python: 65%
+  - JavaScript: 20%
+  - HTML/CSS: 15%
+
+Development Time: ~2-3 weeks
+Team Size: 6 members
+```
+
+---
+
+<div align="center">
+
+### ⭐ Nếu dự án hữu ích, hãy give a ⭐ Star!
+
+Made with ❤️ by **Nhóm 8 - ĐHGTVT TP.HCM**
+
+**Last Updated**: November 29, 2025
+
+</div>

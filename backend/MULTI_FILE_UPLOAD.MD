@@ -1,69 +1,85 @@
-# Hướng dẫn Multi-File Upload và Folder Upload
+# Hướng dẫn: Multi-File Upload & Folder Upload
+
+## Mục lục
+
+- [Tổng quan](#tổng-quan)
+- [Tính năng nổi bật](#tính-năng-nổi-bật)
+- [Sử dụng (ví dụ)](#sử-dụng-ví-dụ)
+- [Tùy chọn dòng lệnh](#tùy-chọn-dòng-lệnh)
+- [Ví dụ thực tế](#ví-dụ-thực-tế)
+- [Tối ưu hiệu suất](#tối-ưu-hiệu-suất)
+- [Xử lý lỗi & Khôi phục](#xử-lý-lỗi--khôi-phục)
+- [Logging & Monitoring](#logging--monitoring)
+- [Khắc phục sự cố](#khắc-phục-sự-cố)
+- [Best Practices](#best-practices)
 
 ## Tổng quan
 
-FlexTransfer Hub đã được nâng cấp để hỗ trợ upload nhiều files cùng lúc và upload cả folder với các tính năng mạnh mẽ.
+TransferFlow Hub đã được nâng cấp để hỗ trợ:
 
-## Tính năng mới
+- Upload nhiều file cùng lúc (multi-file upload)
+- Upload toàn bộ thư mục (folder upload) và duyệt đệ quy
+- Kiểm soát concurrency, theo dõi tiến trình, và xử lý lỗi/retry
 
-### 1. **Multi-File Upload**
-- Upload nhiều files cùng lúc
-- Concurrency control để tối ưu hiệu suất
-- Progress tracking cho từng file
-- Error handling và retry logic
+## Tính năng nổi bật
 
-### 2. **Folder Upload**
-- Upload toàn bộ folder
-- Hỗ trợ duyệt đệ quy subfolder
-- Tự động scan và thu thập files
-- Loại bỏ duplicate files
+- Multi-File Upload
 
-### 3. **Concurrency Control**
-- Giới hạn số lượng upload đồng thời
-- Semaphore-based throttling
-- Tối ưu cho network bandwidth
+  - Upload nhiều file đồng thời
+  - Giới hạn concurrency để tối ưu hiệu suất
+  - Theo dõi tiến trình cho từng file
+  - Retry logic cho các lỗi mạng tạm thời
 
-## Cách sử dụng
+- Folder Upload
 
-### **Upload nhiều files cụ thể**
+  - Upload toàn bộ folder, hỗ trợ duyệt đệ quy (subfolders)
+  - Tự động scan và thu thập file
+  - Loại bỏ file trùng lặp
 
-```bash
-# Upload 3 files cụ thể
+- Concurrency Control
+  - Giới hạn số upload đồng thời
+  - Sử dụng semaphore/throttling để tối ưu băng thông
+
+## Sử dụng (ví dụ)
+
+Upload các file cụ thể:
+
+```powershell
+# Upload 3 file cụ thể
 python app.py --mode client --file file1.txt file2.pdf file3.jpg
 
-# Upload với concurrency cao hơn
+# Tăng concurrency
 python app.py --mode client --file file1.txt file2.pdf file3.jpg --concurrency 5
 
-# Upload với chunk size tùy chỉnh
+# Tùy chỉnh kích thước chunk (bytes)
 python app.py --mode client --file file1.txt file2.pdf --chunk 128000
 ```
 
-### **Upload folder**
+Upload folder:
 
-```bash
-# Upload folder hiện tại (không duyệt subfolder)
+```powershell
+# Upload folder (không duyệt subfolder)
 python app.py --mode client --dir ./documents
 
-# Upload folder với duyệt đệ quy subfolder
+# Upload folder với duyệt đệ quy
 python app.py --mode client --dir ./documents --recursive
 
 # Upload nhiều folder cùng lúc
 python app.py --mode client --dir ./documents ./images ./videos
 
-# Upload folder với concurrency cao
+# Folder upload với concurrency cao
 python app.py --mode client --dir ./documents --concurrency 8
 ```
 
-### **Kết hợp files và folders**
+Kết hợp files và folders:
 
-```bash
-# Upload cả files cụ thể và folders
+```powershell
 python app.py --mode client \
   --file important.txt backup.pdf \
   --dir ./documents ./images \
   --recursive
 
-# Upload với logging chi tiết
+# Ghi log chi tiết
 python app.py --mode client \
   --file file1.txt file2.txt \
   --dir ./folder1 ./folder2 \
@@ -71,16 +87,15 @@ python app.py --mode client \
   --log-file upload.log
 ```
 
-### **Chạy cả server và client**
+Chạy cả server và client (local):
 
-```bash
-# Upload folder khi chạy cả server và client
+```powershell
 python app.py --mode both \
   --dir ./uploads \
   --recursive \
   --concurrency 4
 
-# Upload nhiều files với server tùy chỉnh
+# Chạy server trên host/port tùy chỉnh
 python app.py --mode both \
   --host 0.0.0.0 \
   --port 8766 \
@@ -88,32 +103,25 @@ python app.py --mode both \
   --dir ./documents
 ```
 
-## Command Line Options
+## Tùy chọn dòng lệnh
 
-### **File và Folder Options**
-- `--file PATH [PATH ...]`: Chỉ định files cụ thể để upload
-- `--dir PATH [PATH ...]`: Chỉ định folders để upload
-- `--recursive`: Duyệt đệ quy vào subfolder khi upload folder
-
-### **Upload Control Options**
-- `--concurrency N`: Số lượng upload đồng thời (mặc định: 2)
-- `--chunk SIZE`: Kích thước chunk trong bytes (mặc định: 64KB)
-- `--interactive`: Chế độ interactive (chỉ hỗ trợ single file)
-
-### **Server Options**
-- `--host HOST`: Host cho server (mặc định: localhost)
-- `--port PORT`: Port cho server (mặc định: 8765)
-- `--ws URL`: WebSocket URL cho client
-
-### **Logging Options**
-- `--log-level LEVEL`: Log level (DEBUG, INFO, WARNING, ERROR)
-- `--log-file PATH`: Lưu log vào file
+- `--file PATH [PATH ...]` : Chỉ định file cụ thể để upload
+- `--dir PATH [PATH ...]` : Chỉ định folder để upload
+- `--recursive` : Duyệt đệ quy subfolders khi upload folder
+- `--concurrency N` : Số upload đồng thời (mặc định: 2)
+- `--chunk SIZE` : Kích thước chunk (bytes), mặc định ~64KB
+- `--interactive` : Chế độ interactive (hỗ trợ single file)
+- `--host HOST` : Host cho server (mặc định: localhost)
+- `--port PORT` : Port cho server (mặc định: 8765)
+- `--ws URL` : WebSocket URL cho client
+- `--log-level LEVEL` : Log level (DEBUG, INFO, WARNING, ERROR)
+- `--log-file PATH` : Ghi log ra file
 
 ## Ví dụ thực tế
 
-### **Upload project folder**
-```bash
-# Upload toàn bộ project với subfolder
+Upload toàn bộ project (có subfolder):
+
+```powershell
 python app.py --mode client \
   --dir ./my-project \
   --recursive \
@@ -121,9 +129,9 @@ python app.py --mode client \
   --log-level INFO
 ```
 
-### **Backup nhiều folders**
-```bash
-# Backup documents, images, và videos
+Backup nhiều folder:
+
+```powershell
 python app.py --mode client \
   --dir ./documents ./images ./videos \
   --recursive \
@@ -131,9 +139,9 @@ python app.py --mode client \
   --log-file backup.log
 ```
 
-### **Upload với server remote**
-```bash
-# Upload files lên server remote
+Upload tới server remote qua WebSocket:
+
+```powershell
 python app.py --mode client \
   --ws ws://192.168.1.100:8765/ws \
   --file important.txt backup.pdf \
@@ -141,39 +149,44 @@ python app.py --mode client \
   --concurrency 8
 ```
 
-## Performance Tips
+## Tối ưu hiệu suất
 
-### **Concurrency Optimization**
-- **Network tốt**: Sử dụng `--concurrency 8-16`
-- **Network chậm**: Sử dụng `--concurrency 2-4`
-- **Server yếu**: Giới hạn `--concurrency 2-4`
+- Concurrency Optimization
 
-### **Chunk Size Optimization**
-- **Files nhỏ**: `--chunk 32768` (32KB)
-- **Files lớn**: `--chunk 131072` (128KB)
-- **Network chậm**: `--chunk 32768` (32KB)
+  - Network tốt: `--concurrency 8-16`
+  - Network chậm: `--concurrency 2-4`
+  - Server yếu: giới hạn `--concurrency 2-4`
 
-### **Memory Usage**
-- Mỗi concurrent upload sử dụng ~1-2MB RAM
-- Với 1000 files, cần ~2-4GB RAM cho concurrency cao
+- Chunk Size
 
-## Error Handling
+  - File nhỏ: `--chunk 32768` (32KB)
+  - File lớn: `--chunk 131072` (128KB)
+  - Network chậm: giảm chunk (ví dụ 32768)
 
-### **Common Issues**
-1. **File không tồn tại**: Sẽ được skip và log warning
-2. **Permission denied**: Sẽ được skip và log error
-3. **Network timeout**: Sẽ retry tự động
-4. **Disk full**: Sẽ dừng và log error
+- Memory Usage
+  - Mỗi upload đồng thời ~1-2MB RAM
+  - Với nhiều file (ví dụ 1000 file) cân nhắc giảm concurrency
 
-### **Recovery**
-- Upload sẽ tiếp tục với các files còn lại
-- Failed files được liệt kê trong summary
-- Có thể retry failed files riêng lẻ
+## Xử lý lỗi & Khôi phục
 
-## Logging và Monitoring
+Common issues:
 
-### **Progress Tracking**
-```
+1. File không tồn tại: sẽ được bỏ qua (skip) và ghi warning
+2. Permission denied: bỏ qua và ghi error
+3. Network timeout: tự động retry (theo policy)
+4. Disk full: dừng và ghi lỗi
+
+Recovery:
+
+- Quy trình tiếp tục với các file còn lại
+- Các file thất bại được liệt kê trong bản tóm tắt (summary)
+- Hỗ trợ retry riêng cho các file failed
+
+## Logging & Monitoring
+
+Ví dụ log:
+
+```text
 [14:30:15] app - INFO: Starting multi-file upload: 150 files
 [14:30:16] client - INFO: Progress: 5/150 files completed (3.3%)
 [14:30:17] client - INFO: Progress: 12/150 files completed (8.0%)
@@ -181,37 +194,26 @@ python app.py --mode client \
 ...
 [14:35:20] client - INFO: Batch upload completed: 148/150 files successful
 [14:35:20] client - WARNING: Failed files (2):
-[14:35:20] client - WARNING:   - /path/to/corrupted/file1.txt
-[14:35:20] client - WARNING:   - /path/to/permission/file2.pdf
+  - /path/to/corrupted/file1.txt
+  - /path/to/permission/file2.pdf
 ```
 
-### **Performance Metrics**
+Performance metrics để theo dõi:
+
 - Tổng thời gian upload
 - Tốc độ trung bình
-- Success rate
-- Failed files list
+- Success rate và danh sách failed files
 
-## Troubleshooting
+## Khắc phục sự cố
 
-### **Upload chậm**
-- Tăng `--concurrency`
-- Giảm `--chunk` size
-- Kiểm tra network bandwidth
-
-### **Memory issues**
-- Giảm `--concurrency`
-- Kiểm tra available RAM
-- Sử dụng `--log-level ERROR` để giảm log
-
-### **Network errors**
-- Kiểm tra WebSocket connection
-- Giảm `--concurrency`
-- Tăng timeout settings
+- Upload chậm: tăng `--concurrency` hoặc giảm `--chunk`
+- Memory issues: giảm `--concurrency`, kiểm tra RAM
+- Network errors: kiểm tra WebSocket, giảm concurrency, tăng timeout
 
 ## Best Practices
 
-1. **Test với ít files trước**: Bắt đầu với 5-10 files
-2. **Monitor system resources**: Kiểm tra CPU, RAM, network
-3. **Use appropriate concurrency**: Không quá cao so với network capacity
-4. **Log everything**: Sử dụng `--log-file` cho production
-5. **Handle failures gracefully**: Luôn có backup plan
+1. Test với ít file trước (5–10 file)
+2. Giám sát tài nguyên (CPU, RAM, network)
+3. Chọn concurrency phù hợp với băng thông và sức mạnh server
+4. Ghi log (sử dụng `--log-file`) cho môi trường production
+5. Thiết kế recovery/ retry cho các file thất bại
