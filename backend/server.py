@@ -43,7 +43,7 @@ class UploadSession:
     file_id: str
     file_name: str
     file_size: int
-    status: str = "active"  # active | paused | completed | stopped | error | uploading
+    status: str = "active"  # active | paused/resumed | completed | stopped | error | uploading 
     bytes_received: int = 0
     temp_file_path: Path = field(default_factory=Path)
     remote_file_id: Optional[str] = None
